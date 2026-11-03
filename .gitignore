@@ -1,0 +1,19 @@
+# MacOS files
+.DS_Store
+
+# IDE files
+/.idea
+
+# MkDocs build output and docs tooling venv
+/site
+/.venv
+
+# Build artifacts
+/target
+
+# Test artifacts
+/testing/cli/target
+/testing/e2e/target
+
+# Wrangler's local state
+/.wrangler

@@ -1,0 +1,32 @@
+description = "remove takes an entry out of phast.toml, leaving the rest of the file untouched."
+tier        = "focused"
+network     = false
+
+# The mirror of the add workflow, and asserted the same way: what a manifest editor is
+# worth is what it leaves behind, so `snapshots/phast.toml.snap` is the whole contract.
+
+[[step]]
+args   = ["remove", "psr/log", "--no-install"]
+stdout = ["Removed psr/log from require.", "phast.toml updated."]
+# --no-install stops after the manifest edit, so neither install artifact appears.
+absent = ["phast.lock", "vendor"]
+
+# Removing it twice is an error, not a no-op: the second call names the section it
+# looked in, so a dev dependency removed without --dev says so rather than passing.
+[[step]]
+args   = ["remove", "psr/log", "--no-install"]
+status = 1
+stderr = ["'psr/log' is not in require.", "use --dev"]
+
+# The only entry in [require-dev], so the section goes with it.
+[[step]]
+args   = ["remove", "--dev", "phpunit/phpunit", "--no-install"]
+stdout = ["Removed phpunit/phpunit from require-dev.", "phast.toml updated."]
+
+# The manifest is still valid, and matches the snapshot exactly: the schema header and
+# both comments intact, the alignment of the surviving [require] entry undisturbed, and
+# the emptied [require-dev] header gone rather than left behind as a bare table.
+[[step]]
+args    = ["validate"]
+stdout  = ["phast.toml is valid."]
+matches = true

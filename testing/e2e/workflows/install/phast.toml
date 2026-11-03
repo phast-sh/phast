@@ -1,0 +1,18 @@
+#:schema https://phast.sh/schema/v1/manifest.json
+[package]
+name = "acme/blog"
+type = "project"
+
+[require]
+"acme/markdown" = "^1.0"
+
+# A path repository, which is what keeps this workflow offline: the dependency is
+# resolved and installed from the directory beside it, with no registry involved.
+[[repositories]]
+type = "path"
+url  = "packages/markdown"
+
+# Pins the platform so resolution never shells out to `php --version`: this workflow
+# asserts what Phast writes, and the interpreter on the machine is not one of its inputs.
+[config]
+platform = { php = "8.4" }

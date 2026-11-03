@@ -1,0 +1,75 @@
+description = "A workspace resolves and installs its members together, under one lock and one autoloader."
+tier        = "focused"
+network     = false
+
+# Two members, one depending on the other, with the shared constraint declared once at the
+# root. Path-only, so the whole thing runs offline.
+#
+# The parts worth pinning are all structural: how many lock files exist, whether members are
+# linked into vendor or mapped where they lie, and whether { workspace = true } reaches the
+# resolver as the root's constraint.
+
+# Both members are found by the glob, each with its version and path.
+# Asserted as whole lines, columns and all: a member is only identified by all three of
+# name, version and path, and a substring per field would pass just as well if the version
+# went missing or the two rows were transposed.
+[[step]]
+args   = ["workspace"]
+stdout = [
+    "Members (2)",
+    "acme/blog      1.0.0    packages/blog",
+    "acme/markdown  1.0.0    packages/markdown",
+]
+
+# Coverage, observed from the outside: the plural wording is only reached when more than one
+# manifest was examined, so a run that checked only the root would say "phast.toml is valid."
+# and fail this step. A clean pass on its own would not catch that, since a root-only run of a
+# clean project passes too.
+[[step]]
+args   = ["validate"]
+stdout = ["Every manifest is valid."]
+
+# One lock for the workspace, at the root. A member never gets its own: that is the whole
+# point of resolving them together, and a per-member lock would mean two resolutions that
+# can disagree.
+[[step]]
+args    = ["lock"]
+stdout  = ["(2 packages)"]
+creates = ["phast.lock"]
+absent  = ["packages/blog/phast.lock", "packages/markdown/phast.lock"]
+
+# Members are mapped where they lie rather than copied or linked into vendor, so vendor
+# holds the loader and nothing else. This is where a workspace differs from a path
+# repository, which does link its package into vendor/acme.
+[[step]]
+args    = ["install"]
+creates = ["vendor/autoload.php", "vendor/phast/autoload_psr4.php"]
+absent  = ["vendor/acme"]
+
+# The inheritance, observed from the resolver's side: blog declares { workspace = true } and
+# no constraint, and what comes back is the root's ^1.0 attributed to blog.
+[[step]]
+args   = ["why", "acme/markdown", "--member", "packages/blog"]
+stdout = ["acme/markdown 1.0.0 is required by:", "acme/blog", "^1.0"]
+
+# Scripts are per member, so --member picks whose to run from the workspace root. The
+# member chosen is the one that inherits its constraint, which is the harder case: its
+# manifest on disk still holds { workspace = true }, so running its scripts is only
+# possible through the workspace that expands the ref.
+#
+# One autoloader covers both members, with each prefix pointing at the member directory
+# rather than into vendor, which is what lets a member require its sibling.
+[[step]]
+args   = ["run", "check", "--member", "packages/blog"]
+stdout = ["> echo checking acme/blog", "checking acme/blog"]
+
+# Opting a member into a version the root already pins. There is nothing to choose, so this
+# reaches no registry even though no constraint was given -- the reason the workflow can
+# assert it at all with network = false.
+#
+# Snapshotted rather than grepped: what matters is that the member gained
+# { workspace = true } and nothing else moved, comments and key order included.
+[[step]]
+args    = ["add", "--member", "packages/blog", "psr/log", "--no-install"]
+stdout  = ["inheriting the workspace version"]
+matches = true

@@ -1,0 +1,19 @@
+[package]
+name              = "phast-resolver"
+version           = "0.1.0"
+edition           = "2024"
+description       = "PubGrub-based dependency resolver for Phast"
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+phast-core    = { workspace = true }
+phast-version = { workspace = true }
+pubgrub       = { workspace = true }
+anyhow        = { workspace = true }
+thiserror     = { workspace = true }
+tokio         = { workspace = true }

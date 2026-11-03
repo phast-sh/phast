@@ -1,0 +1,107 @@
+/*
+ * The landing page hero. Used only by overrides/home.html.
+ *
+ * The wave fill is spelled out per scheme because a data URI cannot read a
+ * custom property. It has to stay equal to --md-default-bg-color: #fff by
+ * default, hsla(225, 15%, 14%, 1) in slate, where 225deg is --md-hue.
+ */
+
+.mdx-container {
+  /*
+   * Capped, or the wave scales with the container width until its crest cuts
+   * through the buttons. preserveAspectRatio='none' goes with the cap: a box
+   * whose aspect no longer matches the viewBox is otherwise fitted and centred,
+   * leaving the block's color either side of the wave.
+   */
+  --phast-wave-height: clamp(5rem, 12vw, 13rem);
+
+  padding-top: 1rem;
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1123 258' preserveAspectRatio='none'><path d='M1124,2c0,0 0,256 0,256l-1125,0l0,-48c0,0 16,5 55,5c116,0 197,-92 325,-92c121,0 114,46 254,46c140,0 214,-167 572,-166Z' style='fill: hsla(0, 0%, 100%, 1)'/></svg>")
+      no-repeat bottom,
+    linear-gradient(
+      to bottom,
+      var(--md-primary-fg-color),
+      var(--md-primary-fg-color--light) 99%,
+      var(--md-default-bg-color) 99%
+    );
+
+  /* Wave first, gradient second, matching the layer order above. */
+  background-size:
+    100% var(--phast-wave-height),
+    auto;
+}
+
+[data-md-color-scheme="slate"] .mdx-container {
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1123 258' preserveAspectRatio='none'><path d='M1124,2c0,0 0,256 0,256l-1125,0l0,-48c0,0 16,5 55,5c116,0 197,-92 325,-92c121,0 114,46 254,46c140,0 214,-167 572,-166Z' style='fill: hsla(225, 15%, 14%, 1)'/></svg>")
+      no-repeat bottom,
+    linear-gradient(
+      to bottom,
+      var(--md-primary-fg-color),
+      var(--md-primary-fg-color--dark) 99%,
+      var(--md-default-bg-color) 99%
+    );
+
+  /* Repeated because the background shorthand above resets it to auto. */
+  background-size:
+    100% var(--phast-wave-height),
+    auto;
+}
+
+.mdx-hero {
+  margin: 0 0.8rem;
+  color: var(--md-primary-bg-color);
+}
+
+.mdx-hero h1 {
+  margin-bottom: 1rem;
+  color: currentcolor;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.mdx-hero p {
+  color: currentcolor;
+}
+
+/* The default code background is tuned for the page, not for a colored block. */
+.mdx-hero code {
+  background-color: hsla(0, 0%, 100%, 0.12);
+  color: currentcolor;
+}
+
+/* Clearance for the wave, whose crest reaches nearly its full height. */
+.mdx-hero__content {
+  padding-bottom: calc(var(--phast-wave-height) + 2rem);
+}
+
+.mdx-hero .md-button {
+  margin-top: 0.5rem;
+  margin-right: 0.5rem;
+  color: var(--md-primary-bg-color);
+}
+
+.mdx-hero .md-button--primary {
+  background-color: var(--md-primary-bg-color);
+  border-color: var(--md-primary-bg-color);
+  color: var(--md-primary-fg-color);
+}
+
+.mdx-hero .md-button:focus,
+.mdx-hero .md-button:hover {
+  background-color: var(--md-accent-fg-color);
+  border-color: var(--md-accent-fg-color);
+  color: var(--md-accent-bg-color);
+}
+
+@media screen and (min-width: 60em) {
+  .mdx-hero h1 {
+    font-size: 2.2rem;
+  }
+
+  .mdx-hero__content {
+    max-width: 32rem;
+    margin-top: 2.5rem;
+  }
+}

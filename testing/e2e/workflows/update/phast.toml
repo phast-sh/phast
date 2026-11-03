@@ -1,0 +1,10 @@
+#:schema https://phast.sh/schema/v1/manifest.json
+[package]
+name = "acme/blog"
+type = "project"
+
+# The lock beside this file pins psr/log 1.0.0, which this constraint has since outgrown:
+# the state a project is in when a dependency has moved on and nobody has run update yet.
+[require]
+php       = "^8.4"
+"psr/log" = "^1.0"

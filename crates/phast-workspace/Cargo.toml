@@ -1,0 +1,22 @@
+[package]
+name              = "phast-workspace"
+version           = "0.1.0"
+edition           = "2024"
+description       = "Workspace detection and member resolution for Phast"
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[dev-dependencies]
+indoc    = { workspace = true }
+tempfile = { workspace = true }
+
+[dependencies]
+phast-core    = { workspace = true }
+phast-version = { workspace = true }
+globset       = { workspace = true }
+indexmap      = { workspace = true }
+anyhow        = { workspace = true }

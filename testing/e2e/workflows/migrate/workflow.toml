@@ -1,0 +1,48 @@
+description = "migrate turns a composer.json into a phast.toml that Phast itself accepts."
+tier        = "focused"
+network     = false
+
+# The adoption path, so what it is worth is whether the file it hands back is one the rest
+# of the tool will take. Translating is only half of that; the steps after the first are
+# Phast reading its own output.
+#
+# The composer.json covers what a real one carries: both require sections, psr-4 and files
+# autoload, a path repository, lifecycle and named scripts, config, and one field Phast
+# does not support yet.
+
+[[step]]
+args    = ["migrate"]
+stdout  = ["composer.json migrated to phast.toml. Run 'phast install' to install dependencies."]
+# An unsupported field is reported rather than dropped in silence, and names itself.
+stderr  = ["not yet supported and were not carried over: non-feature-branches"]
+creates = ["phast.toml"]
+# Translation resolves nothing, so the steps that follow only read a manifest.
+absent  = ["phast.lock", "vendor"]
+
+# Migrating twice refuses rather than overwriting, so a second run cannot quietly discard
+# edits made to phast.toml since the first.
+[[step]]
+args   = ["migrate"]
+status = 1
+stderr = ["'phast.toml' already exists. Use --force to overwrite."]
+
+[[step]]
+args   = ["migrate", "--force"]
+stdout = ["composer.json migrated to phast.toml."]
+
+# The point of the whole workflow: Phast accepts what Phast wrote. --strict makes a warning
+# fatal, so this fails if migration ever emits something validate merely tolerates, such as
+# a [sources] entry pointing at a directory that is not there.
+[[step]]
+args   = ["validate", "--strict"]
+stdout = ["phast.toml is valid."]
+
+# And it arrives canonical, or the first `phast fmt` would rewrite the file the user was
+# just handed and show them a diff they did not make.
+[[step]]
+args    = ["fmt", "--check"]
+stdout  = ["phast.toml is already formatted, nothing to do."]
+# Byte for byte: the schema header, sections ordered as Phast writes them, require sorted
+# with php first under sort-packages, the path repository turned into a [sources] entry
+# keyed by the name read from the package's own manifest, and scripts kept as written.
+matches = true

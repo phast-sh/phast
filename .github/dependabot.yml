@@ -1,0 +1,45 @@
+# Dependabot opens pull requests; nothing reaches main until one is reviewed and merged.
+#
+# Minor and patch updates are grouped into one weekly PR per ecosystem. A major version is
+# left out of the group, so it arrives as a PR of its own, since it may need code changes.
+
+version: 2
+
+updates:
+  # The Rust workspace: Cargo.toml and Cargo.lock.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+    groups:
+      cargo:
+        update-types: [minor, patch]
+
+  # Actions used by ci.yml and release.yml.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+    groups:
+      actions:
+        update-types: [minor, patch]
+
+  # Base images in the Dockerfiles under docker/.
+  - package-ecosystem: docker
+    directories:
+      - /docker/phast
+      - /docker/php
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+    groups:
+      docker:
+        update-types: [minor, patch]

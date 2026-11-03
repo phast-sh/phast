@@ -1,0 +1,16 @@
+[package]
+name    = "acme/blog"
+version = "1.0.0"
+type    = "library"
+
+# Inherited from [workspace.dependencies] rather than pinned here.
+[require]
+"acme/markdown" = { workspace = true }
+
+[autoload.psr-4]
+"Acme\\Blog\\" = ["src/"]
+
+# Scoped to this member, and reached through the workspace: this member inherits its
+# constraint, so its manifest cannot be read on its own.
+[scripts]
+check = "echo checking acme/blog"

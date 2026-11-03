@@ -1,0 +1,20 @@
+# Python tooling for the documentation site only;
+#
+# Usage:
+#   uv run --group docs mkdocs serve            # live preview at http://127.0.0.1:8000
+#   uv run --group docs mkdocs build --strict   # static build into site/
+
+[project]
+name = "phast-docs"
+version = "0"
+requires-python = ">=3.12"
+
+[tool.uv]
+# Docs tooling only; there is no Python package to build or install here.
+package = false
+
+[dependency-groups]
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.7,<10",
+]

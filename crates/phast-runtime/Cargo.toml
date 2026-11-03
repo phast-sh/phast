@@ -1,0 +1,12 @@
+[package]
+name              = "phast-runtime"
+version           = "0.1.0"
+edition           = "2024"
+description       = "Script execution runtime and lifecycle events for Phast"
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+phast-core = { workspace = true }
+anyhow     = { workspace = true }

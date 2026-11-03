@@ -1,0 +1,97 @@
+site_name: Phast
+site_description: A dependency manager for PHP, written in Rust.
+site_url: https://docs.phast.sh/
+repo_url: https://github.com/phast-sh/phast
+repo_name: phast-sh/phast
+
+docs_dir: docs
+site_dir: site
+
+# The theme overrides live under docs_dir, so MkDocs would otherwise copy the
+# templates into the built site as if they were pages.
+exclude_docs: |
+  overrides/
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  favicon: assets/logo/phast-icon.png
+  logo: assets/logo/phast-icon.png
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/white-balance-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+# Social icons rendered in the footer meta strip.
+# Icon names are paths under https://github.com/squidfunk/mkdocs-material/tree/master/material/templates/.icons
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/phast-sh/phast
+      name: Phast on GitHub
+#    - icon: fontawesome/brands/slack
+#      link: https://join.slack.com/...
+#      name: Phast community Slack
+#    - icon: fontawesome/brands/x-twitter
+#      link: https://x.com/...
+#      name: Phast on X
+
+extra_css:
+  - stylesheets/extra.css
+  - stylesheets/home.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/installation.md
+      - getting-started/first-steps.md
+  - Guides:
+      - guides/migrate-from-composer.md
+      - guides/projects.md
+      - guides/scripts.md
+      - guides/workspaces.md
+      - guides/security.md
+  - Concepts:
+      - concepts/manifest.md
+      - concepts/lockfile.md
+      - concepts/resolution.md
+      - concepts/registries.md
+      - concepts/caching.md
+  - Reference:
+      - reference/commands.md
+      - reference/configuration.md
+      - reference/environment.md

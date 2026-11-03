@@ -1,0 +1,26 @@
+[package]
+name              = "phast-autoload"
+version           = "0.1.0"
+edition           = "2024"
+description       = "PHP autoloader generation for phast (vendor/autoload.php)"
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[dev-dependencies]
+indoc    = { workspace = true }
+tempfile = { workspace = true }
+
+[dependencies]
+phast-core      = { workspace = true }
+phast-workspace = { workspace = true }
+anyhow          = { workspace = true }
+globset         = { workspace = true }
+indexmap        = { workspace = true }
+rayon           = { workspace = true }
+serde_json      = { workspace = true }
+sha2            = { workspace = true }
+hex             = { workspace = true }

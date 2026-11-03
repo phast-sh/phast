@@ -1,0 +1,14 @@
+#:schema https://phast.sh/schema/v1/manifest.json
+[package]
+name = "acme/blog"
+type = "project"
+
+# Runtime dependencies, grouped by role.
+[require]
+php = "^8.4"
+
+# HTTP stack.
+"guzzlehttp/guzzle" = "^7.10"
+
+[config]
+platform = { php = "8.4" }

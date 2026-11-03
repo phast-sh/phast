@@ -1,0 +1,16 @@
+#:schema https://phast.sh/schema/v1/manifest.json
+[package]
+name = "acme/my-blog"
+type = "library"
+
+[require]
+php = "^8.4"
+
+[autoload.psr-4]
+"Acme\\MyBlog\\" = ["src/"]
+
+[autoload-dev.psr-4]
+"Tests\\" = ["tests/"]
+
+[config.platform]
+php = "8.4"

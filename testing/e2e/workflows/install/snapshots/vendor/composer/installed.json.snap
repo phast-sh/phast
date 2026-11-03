@@ -1,0 +1,28 @@
+{
+  "dev": true,
+  "dev-package-names": [],
+  "packages": [
+    {
+      "aliases": [],
+      "dev": true,
+      "install-path": "../../",
+      "name": "__root__",
+      "pretty_version": "dev-main",
+      "reference": null,
+      "type": "project",
+      "version": "dev-main"
+    },
+    {
+      "aliases": [],
+      "dev_requirement": false,
+      "extra": null,
+      "install-path": "../acme/markdown",
+      "name": "acme/markdown",
+      "pretty_version": "1.0",
+      "reference": null,
+      "type": "library",
+      "version": "1.0",
+      "version_normalized": "1.0"
+    }
+  ]
+}

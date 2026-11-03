@@ -1,0 +1,602 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Phast",
+  "description": "A `phast.toml` manifest: what a project is, what it depends on,\nand how Phast should resolve and install it.",
+  "type": "object",
+  "properties": {
+    "package": {
+      "description": "Project identity and metadata.",
+      "$ref": "#/$defs/PackageSection"
+    },
+    "require": {
+      "description": "Runtime dependencies.",
+      "$ref": "#/$defs/RequireSection"
+    },
+    "require-dev": {
+      "description": "Dev-only dependencies, for development and testing.",
+      "$ref": "#/$defs/RequireSection"
+    },
+    "provide": {
+      "description": "Virtual packages this project provides.",
+      "$ref": "#/$defs/ProvideSection"
+    },
+    "replace": {
+      "description": "Packages this project replaces.",
+      "$ref": "#/$defs/ReplaceSection"
+    },
+    "conflict": {
+      "description": "Package versions this project is incompatible with.",
+      "$ref": "#/$defs/ConflictSection"
+    },
+    "suggest": {
+      "description": "Optional package suggestions.",
+      "$ref": "#/$defs/SuggestSection"
+    },
+    "autoload": {
+      "description": "Autoload rules for the project's own code.",
+      "$ref": "#/$defs/AutoloadSection"
+    },
+    "autoload-dev": {
+      "description": "Autoload rules applied only when dev dependencies are installed.",
+      "$ref": "#/$defs/AutoloadSection"
+    },
+    "scripts": {
+      "description": "Lifecycle hooks and named tasks.",
+      "$ref": "#/$defs/ScriptsSection"
+    },
+    "config": {
+      "description": "Resolver and install settings.",
+      "$ref": "#/$defs/ConfigSection"
+    },
+    "repositories": {
+      "description": "Extra package registries and single-package endpoints.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RepositoryDef"
+      }
+    },
+    "sources": {
+      "description": "Per-package source overrides.",
+      "$ref": "#/$defs/SourcesSection"
+    },
+    "workspace": {
+      "description": "Workspace root configuration and its members.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkspaceSection"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "extra": {
+      "description": "Free-form data for tooling; not interpreted by Phast.",
+      "$ref": "#/$defs/ExtraSection"
+    }
+  },
+  "$defs": {
+    "PackageSection": {
+      "description": "Project identity and metadata.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The project's `vendor/package` name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "The project's version, e.g. `\"1.0.0\"`. Required for workspace members that other\nmembers depend on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "description": "A short description of the project.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "description": "Package type, e.g. `library`, `project`, `composer-plugin`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "license": {
+          "description": "SPDX license identifier, e.g. `MIT` or `Apache-2.0`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "homepage": {
+          "description": "The project's homepage URL.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keywords": {
+          "description": "Searchable tags used when publishing to a registry.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "authors": {
+          "description": "The project's authors.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Author"
+          }
+        },
+        "support": {
+          "description": "Support channels, keyed by channel name (issues, source, docs, ...).",
+          "$ref": "#/$defs/Support"
+        },
+        "funding": {
+          "description": "Funding or sponsorship links.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Funding"
+          }
+        }
+      }
+    },
+    "Author": {
+      "description": "An author of a package.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Full name of the author.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "email": {
+          "description": "Contact email address.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "homepage": {
+          "description": "Author's homepage or profile URL.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "description": "Role within the project, e.g. `\"maintainer\"` or `\"contributor\"`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Support": {
+      "description": "Support channels for a package, each mapping a channel name to a URL or address,\ne.g. `issues`, `source`, `docs`, `email`, `chat`.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "Funding": {
+      "description": "A funding or sponsorship link.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "Funding platform, e.g. `\"github\"`, `\"patreon\"`, or `\"open_collective\"`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "description": "URL of the funding or sponsorship page.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "RequireSection": {
+      "description": "Project dependencies: each package name mapped to a version constraint.\n\nKeys are `vendor/package` names or platform packages like `php` and `ext-json`.\nA value is a version constraint (e.g. `\"^7.0\"`), or `{ workspace = true }`\nto inherit the constraint from the workspace root.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/DependencySpec"
+      }
+    },
+    "DependencySpec": {
+      "description": "A dependency value: a version constraint (e.g. `\"^7.0\"`), or `{ workspace = true }`\nto inherit the constraint from the workspace root.",
+      "anyOf": [
+        {
+          "description": "Plain version constraint, e.g. `\"^7.0\"`.",
+          "type": "string"
+        },
+        {
+          "description": "Inherit the version constraint from `[workspace.dependencies]`.",
+          "$ref": "#/$defs/WorkspaceRef"
+        }
+      ]
+    },
+    "WorkspaceRef": {
+      "description": "Inherit a dependency's version constraint from the workspace root.",
+      "type": "object",
+      "properties": {
+        "workspace": {
+          "description": "Set to `true` to take the constraint from the root's `[workspace.dependencies]`.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "workspace"
+      ]
+    },
+    "ProvideSection": {
+      "description": "Virtual packages this project provides, each package name mapped to the version\nprovided (`*` or `self.version` allowed).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "ReplaceSection": {
+      "description": "Packages this project supplies itself, each package name mapped to the version\nreplaced (`*` or `self.version` allowed).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "ConflictSection": {
+      "description": "Packages this project is incompatible with, each package name\nmapped to a constraint of versions to exclude.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "SuggestSection": {
+      "description": "Optional packages, each package name mapped to a human-readable reason.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "AutoloadSection": {
+      "description": "Autoloading rules for the project's own code, compiled into the generated autoloader\nalongside every dependency's rules. A PSR prefix maps to one path or a list of paths.",
+      "type": "object",
+      "properties": {
+        "psr-4": {
+          "description": "A PSR-4 namespace prefix mapped to its path (or list of paths).\nInsertion-ordered, so a handwritten order survives a round trip.",
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          }
+        },
+        "psr-0": {
+          "description": "A PSR-0 namespace prefix mapped to its path (or list of paths).\nInsertion-ordered, so a handwritten order survives a round trip.",
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          }
+        },
+        "classmap": {
+          "description": "Directories or files scanned for class definitions.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "files": {
+          "description": "Files always loaded by the autoloader, e.g. global helper functions.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude": {
+          "description": "Path patterns kept out of the generated classmap.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ScriptsSection": {
+      "description": "Lifecycle hooks and named tasks. A key is a lifecycle event (e.g. `post-install`) or\na task name you run with `phast run <name>`; its value is a single command or a list\nof commands run in order.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Script"
+      }
+    },
+    "Script": {
+      "description": "A single command, or a list of commands run in order.\n\nA command is a shell line, an `@php` invocation, or a `Vendor\\Class::method` callback.",
+      "anyOf": [
+        {
+          "description": "One command.",
+          "type": "string"
+        },
+        {
+          "description": "Commands run in the order given.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "ConfigSection": {
+      "description": "Resolver and install settings.",
+      "type": "object",
+      "properties": {
+        "minimum-stability": {
+          "description": "Lowest release stability the resolver may select. Defaults to `stable`.",
+          "type": "string",
+          "enum": [
+            "stable",
+            "rc",
+            "beta",
+            "alpha",
+            "dev"
+          ]
+        },
+        "minimum-package-age": {
+          "description": "Minimum age a package version must have before it can be selected.\n\nExpressed as a duration string: `\"24h\"`, `\"7d\"`, `\"2w\"`.\nVersions published more recently than this threshold are excluded.",
+          "type": "string",
+          "pattern": "^[0-9]+[hdwHDW]$"
+        },
+        "prefer-stable": {
+          "description": "When `true`, prefer stable releases over pre-releases of equal constraint fit.",
+          "type": "boolean"
+        },
+        "classmap-authoritative": {
+          "description": "Generate the autoloader in classmap-authoritative mode: trust\nthe classmap exclusively and drop the PSR filesystem fallback.",
+          "type": "boolean"
+        },
+        "sort-packages": {
+          "description": "When `true`, sort every dependency section on each write, platform packages\nfirst and then alphabetically.",
+          "type": "boolean"
+        },
+        "platform": {
+          "description": "Platform version overrides used during resolution.",
+          "$ref": "#/$defs/Platform"
+        },
+        "secure-http": {
+          "description": "Reject plaintext `http://` registry URLs. Enabled by default;\nset to `false` to allow a trusted internal registry served over HTTP.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "platform-check": {
+          "description": "Whether `platform_check.php` is generated, and how much it verifies:\n`\"php\"`, `\"all\"`, or `\"off\"`. Absent means the `php` default.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "allow-plugins": {
+          "description": "Plugin execution allowlist: `\"vendor/plugin\" = true` to allow, `false` to block.\nReserved: an entry here is recorded and has no effect on what runs.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "Platform": {
+      "description": "Platform version overrides, so resolution behaves the same\nregardless of the locally installed PHP and extensions.",
+      "type": "object",
+      "properties": {
+        "php": {
+          "description": "Override the PHP version used during resolution, e.g. `\"8.2\"`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "RepositoryDef": {
+      "description": "An extra registry or single-package source endpoint.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "What kind of repository this is.",
+          "$ref": "#/$defs/RepositoryType"
+        },
+        "url": {
+          "description": "Repository URL or local path.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Name used to reference this repository from `[sources]`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default": {
+          "description": "When `true`, packages not listed in `[sources]` are fetched from this repository.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "RepositoryType": {
+      "description": "The `type` of a `[[repositories]]` entry: what a user writes in a manifest.\n\n`Vcs` and `Git` are two spellings of the same thing and behave identically, since\nthe host driver is chosen from the URL (`host_for`), not from this type. Both are\naccepted because both appear in real manifests.",
+      "oneOf": [
+        {
+          "description": "Generic VCS repository (the backend is detected from the URL).",
+          "type": "string",
+          "const": "vcs"
+        },
+        {
+          "description": "Explicit Git repository.",
+          "type": "string",
+          "const": "git"
+        },
+        {
+          "description": "A Packagist-style registry (v2/v1 API).",
+          "type": "string",
+          "const": "composer"
+        },
+        {
+          "description": "Local path repository.",
+          "type": "string",
+          "const": "path"
+        },
+        {
+          "description": "Inline package definition.",
+          "type": "string",
+          "const": "package"
+        },
+        {
+          "description": "Packagist (the default registry); can be disabled or redirected.",
+          "type": "string",
+          "const": "packagist"
+        }
+      ]
+    },
+    "SourcesSection": {
+      "description": "Where individual packages come from, mapping each `\"vendor/package\"` name to its\nsource: a named `[[repositories]]` endpoint, a single-package git source, a local\npath, or an inline package.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/SourceSpec"
+      }
+    },
+    "SourceSpec": {
+      "description": "A single `[sources]` entry: where one package comes from. Which fields you set\nselects the kind of source:\n\n- `repository` - fetch from the named `[[repositories]]` endpoint.\n- `path` - a local package on disk (optionally with `symlink` and `version`).\n- `url` with `version` - a self-describing inline package.\n- `url` with no `version` - a git source, whose metadata is read from the repository.",
+      "type": "object",
+      "properties": {
+        "repository": {
+          "description": "Name of the `[[repositories]]` endpoint this package is fetched from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "description": "Clone URL of a single-package git source or inline package.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "branch": {
+          "description": "Branch to check out (git source).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tag": {
+          "description": "Tag to check out (git source).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reference": {
+          "description": "Exact commit reference to check out (git source or inline package).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "Filesystem path to a local package directory.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "symlink": {
+          "description": "Symlink a path package into `vendor/`. Only `true` is accepted: copying is\nnot supported, so `symlink = false` is rejected rather than silently ignored.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "The package's version. Supplies the version for a path source,\nor (with `url`) marks a self-describing inline package.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "WorkspaceSection": {
+      "description": "Marks this manifest as a workspace root and configures its members.\nPresent only in a root manifest.",
+      "type": "object",
+      "properties": {
+        "members": {
+          "description": "Glob patterns that identify member directories, relative to the workspace root.\nEach matched directory must contain a `phast.toml` to be treated as a member.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude": {
+          "description": "Glob patterns that exclude directories from membership even if they match `members`.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependencies": {
+          "description": "Shared version constraints that members inherit with `{ workspace = true }`. Values\nare plain version constraints; whether a member treats one as dev-only is decided in\nits own `[require]` or `[require-dev]`.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ExtraSection": {
+      "description": "Free-form data for plugins and framework tooling.\nPhast preserves it but does not interpret it.",
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$id": "https://phast.sh/schema/v1/manifest.json"
+}

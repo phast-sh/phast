@@ -1,0 +1,37 @@
+#:schema https://phast.sh/schema/v1/manifest.json
+[package]
+name = "acme/blog"
+description = "A blog, before it moved to Phast."
+type = "project"
+license = "MIT"
+
+[require]
+php = "^8.4"
+"acme/markdown" = "^1.0"
+"psr/log" = "^3.0"
+
+[require-dev]
+"phpunit/phpunit" = "^11.0"
+
+[autoload]
+files = ["src/helpers.php"]
+
+[autoload.psr-4]
+"Acme\\Blog\\" = ["src/"]
+
+[autoload-dev.psr-4]
+"Acme\\Blog\\Tests\\" = ["tests/"]
+
+[scripts]
+post-autoload-dump = [
+    "@php -r \"echo 'dumped';\""
+]
+test = "phpunit"
+
+[config]
+minimum-stability = "stable"
+prefer-stable = true
+sort-packages = true
+
+[sources]
+"acme/markdown" = { path = "packages/markdown" }

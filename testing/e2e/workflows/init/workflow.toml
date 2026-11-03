@@ -1,0 +1,34 @@
+description = "init scaffolds a package that Phast's own validators accept."
+tier        = "focused"
+network     = false
+
+# The only workflow with no input files: init produces its manifest rather than
+# consuming one, so `snapshots/` holds the whole expected result and the directory
+# beside this spec is empty.
+
+[[step]]
+args    = ["init", "--name", "acme/my-blog", "--php", "^8.4", "--yes"]
+stdout  = ["Initialized package in"]
+creates = ["phast.toml", "src", "tests"]
+# Scaffolding resolves nothing, so neither install artifact should appear.
+absent  = ["phast.lock", "vendor"]
+
+# What a scaffold is worth is whether the rest of the tool accepts it. `--strict`
+# makes a warning a failure, so this fails if init ever emits a manifest that
+# validate merely tolerates.
+[[step]]
+args   = ["validate", "--strict"]
+stdout = ["phast.toml is valid."]
+
+# Likewise, a freshly written manifest must already be in canonical form, or
+# `phast fmt` would rewrite the file the user was just handed.
+[[step]]
+args   = ["fmt", "--check"]
+stdout = ["already formatted"]
+
+# The manifest matches byte for byte: the schema header, the section order, and the
+# namespace derived from the package name. The cli tier parses this file into a
+# toml::Value and so cannot see any of that.
+[[step]]
+args    = ["validate"]
+matches = true

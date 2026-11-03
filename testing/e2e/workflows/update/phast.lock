@@ -1,0 +1,43 @@
+version = 1
+content-hash = "sha256:d7dc02e336010a82668d8b7e1efb798e5ade7aea0d73975972f164db505b5972"
+packages-dev = []
+
+[metadata]
+generated-by = "phast 0.1.0"
+generated-at = "2026-08-06T17:06:18.853222+00:00"
+
+[[packages]]
+name = "psr/log"
+version = "1.0.0"
+type = "library"
+description = "Common interface for logging libraries"
+homepage = ""
+time = "2012-12-21T11:40:51+00:00"
+license = ["MIT"]
+keywords = [
+    "log",
+    "psr",
+    "psr-3",
+]
+
+[packages.dist]
+type = "zip"
+url = "https://api.github.com/repos/php-fig/log/zipball/fe0936ee26643249e916849d48e3a51d5f5e278b"
+reference = "fe0936ee26643249e916849d48e3a51d5f5e278b"
+shasum = ""
+
+[packages.source]
+type = "git"
+url = "https://github.com/php-fig/log.git"
+reference = "fe0936ee26643249e916849d48e3a51d5f5e278b"
+
+[[packages.authors]]
+name = "PHP-FIG"
+homepage = "http://www.php-fig.org/"
+
+[packages.support]
+issues = "https://github.com/php-fig/log/issues"
+source = "https://github.com/php-fig/log/tree/1.0.0"
+
+[packages.autoload.psr-0]
+'Psr\Log\' = [""]

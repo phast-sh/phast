@@ -1,0 +1,18 @@
+[package]
+name              = "phast-version"
+version           = "0.1.0"
+edition           = "2024"
+description       = "PHP version parsing, stability model, and constraint translation for Phast"
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+thiserror = { workspace = true }
+serde     = { workspace = true, optional = true }
+
+[features]
+serde = ["dep:serde"]

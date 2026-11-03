@@ -1,0 +1,17 @@
+[package]
+name              = "phast"
+version           = "0.1.0"
+edition           = "2024"
+description       = "Command-line entry point for Phast, a dependency manager for PHP"
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "phast"
+path = "src/main.rs"
+
+[dependencies]
+phast-cli = { workspace = true }
+tokio     = { workspace = true }
+anyhow    = { workspace = true }

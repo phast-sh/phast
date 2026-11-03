@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --check --all
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --locked --workspace -- -D warnings
+
+  rustdoc:
+    name: Rustdoc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --locked --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  schema:
+    name: Schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run --locked -p phast-core
+          --features schema
+          --bin schema -- --check
+
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked --workspace
+          --exclude phast-cli-tests
+          --exclude phast-e2e-tests
+
+  build:
+    name: Build
+    if: false # disabled until release pipeline is established
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: tests
+      - run: cargo build --locked
+      - run: cargo test --locked -p phast-cli-tests -p phast-e2e-tests --no-run
+      - uses: actions/upload-artifact@v7
+        with:
+          name: phast-bin
+          path: target/debug/phast
+          retention-days: 3
+
+  cli-test:
+    name: CLI Tests
+    if: false # disabled until release pipeline is established
+    runs-on: ubuntu-latest
+    needs: [build, unit-test]
+    env:
+      PHAST_BIN: ${{ github.workspace }}/target/debug/phast
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: tests
+      - uses: actions/download-artifact@v8
+        with:
+          name: phast-bin
+          path: target/debug
+      - run: chmod +x target/debug/phast
+      - run: cargo test --locked -p phast-cli-tests
+
+  e2e-test:
+    name: Workflow Tests
+    if: false # disabled until release pipeline is established
+    runs-on: ubuntu-latest
+    needs: [build, unit-test]
+    env:
+      PHAST_BIN: ${{ github.workspace }}/target/debug/phast
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: tests
+      - uses: actions/download-artifact@v8
+        with:
+          name: phast-bin
+          path: target/debug
+      - run: chmod +x target/debug/phast
+
+      # Workflows that need a registry skip themselves without PHAST_TEST_NETWORK, so this
+      # step is the suite as it must pass on a machine with no network at all.
+      - name: Offline workflows
+        run: cargo test --locked -p phast-e2e-tests -- --nocapture
+
+      # The same suite with the gate open. Kept a separate step so a registry outage or a
+      # new upstream release reads as this step failing, rather than as the offline
+      # workflows breaking.
+      - name: Workflows needing a live registry
+        run: cargo test --locked -p phast-e2e-tests -- --nocapture
+        env:
+          PHAST_TEST_NETWORK: 1
+
+  autoload-test:
+    name: Autoload Tests (PHP ${{ matrix.php }})
+    if: false # disabled until release pipeline is established
+    runs-on: ubuntu-latest
+    needs: [build, unit-test]
+    env:
+      PHAST_BIN: ${{ github.workspace }}/target/debug/phast
+    # Test the minimum, dev, and latest supported PHP versions.
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.0', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: tests
+      - uses: actions/download-artifact@v8
+        with:
+          name: phast-bin
+          path: target/debug
+      - run: chmod +x target/debug/phast
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      # Recorded so a green leg says which interpreter it was green against.
+      - run: php --version
+
+      # The workflow needs no registry: it resolves through a path repository.
+      - run: cargo test --locked -p phast-e2e-tests autoload -- --nocapture
+
+  artifact:
+    name: Artifact
+    if: false # disabled until release pipeline is established
+    runs-on: ubuntu-latest
+    needs: [cli-test, e2e-test, autoload-test]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked
+      - uses: actions/upload-artifact@v7
+        with:
+          name: phast
+          path: target/debug/phast
+          retention-days: 3

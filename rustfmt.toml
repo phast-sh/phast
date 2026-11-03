@@ -1,0 +1,11 @@
+edition = "2024"
+
+# Line width - 100 is the modern community standard (default is 80)
+max_width = 100
+
+# Indentation
+tab_spaces = 4
+hard_tabs = false
+
+# Consistent Unix line endings
+newline_style = "Unix"

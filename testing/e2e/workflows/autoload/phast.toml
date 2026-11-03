@@ -1,0 +1,39 @@
+#:schema https://phast.sh/schema/v1/manifest.json
+[package]
+name = "acme/blog"
+type = "project"
+
+[require]
+"acme/markdown" = "^1.0"
+
+# A path repository, so regenerating the autoloader never needs a registry.
+[[repositories]]
+type = "path"
+url  = "packages/markdown"
+
+# Dev-only rules: present in a default dump, dropped by --no-dev. Nothing else in the
+# manifest distinguishes the two dumps.
+[autoload-dev.psr-4]
+"Acme\\Blog\\Tests\\" = ["tests/"]
+
+# Two probes, each loading one class through the generated autoloader. They are the
+# assertions: what a dump contains is only interesting if it changes what PHP can load.
+#
+# Written as TOML literal strings so the PHP reads as PHP: a basic string would need every
+# namespace separator doubled, which is how `Acme\Markdown\Markdown` becomes unreadable.
+# The command reaches `sh -c` as one argument, so the newlines are just whitespace to it.
+[scripts]
+smoke = '''
+@php -r "
+    require 'vendor/autoload.php';
+
+    echo (new Acme\Markdown\Markdown())->render('Hello, Phast! (╯°□°)╯︵ ┻━┻');
+    echo PHP_EOL;
+"'''
+smoke-dev = '''
+@php -r "
+    require 'vendor/autoload.php';
+
+    echo (new Acme\Blog\Tests\Helper())->name();
+    echo PHP_EOL;
+"'''

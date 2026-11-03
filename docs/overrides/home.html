@@ -1,0 +1,76 @@
+{#-
+  The landing page, selected by `template: home.html` in the front matter of
+  docs/index.md.
+
+  The hero goes in the `tabs` block, not the content block: that is what puts it
+  flush under the header. `super()` keeps the section tabs.
+-#}
+{% extends "main.html" %}
+
+{% block tabs %}
+  {{ super() }}
+
+  {#- Only this page uses the template, so these rules reach no other. -#}
+  <style>
+    /*
+      What the glass header shows through at the top of this page, without which
+      it blurs the page background into a pale strip above a hero that starts on
+      the full-strength color.
+
+      A band rather than an offset measured to the header, which has no fixed
+      height: the tab bar inside it is hidden below 76.25em. It only has to be
+      taller than the tallest header and shorter than the hero, which paints
+      over the rest.
+    */
+    body {
+      background-image: linear-gradient(
+        to bottom,
+        var(--md-primary-fg-color) 0,
+        var(--md-primary-fg-color) 12rem,
+        transparent 12rem
+      );
+      background-repeat: no-repeat;
+    }
+
+    .md-main__inner { margin-top: 0; }
+
+    /* Material injects an h1 of the page title; the hero already carries one. */
+    .md-content__inner > h1:first-child { display: none; }
+
+    @media screen and (min-width: 60em) {
+      .md-sidebar--secondary { display: none; }
+    }
+    @media screen and (min-width: 76.25em) {
+      .md-sidebar--primary { display: none; }
+    }
+  </style>
+
+  <section class="mdx-container">
+    <div class="md-grid md-typeset">
+      <div class="mdx-hero">
+        <div class="mdx-hero__content">
+          <h1>An extremely fast dependency manager for PHP</h1>
+          <p>
+            A drop-in alternative to Composer, written in Rust. Same registries,
+            same <code>vendor/</code>, a TOML-first workflow around
+            <code>phast.toml</code> and <code>phast.lock</code>.
+          </p>
+          <a
+            href="{{ 'getting-started/installation/' | url }}"
+            title="Install Phast"
+            class="md-button md-button--primary"
+          >
+            Get started
+          </a>
+          <a
+            href="{{ 'guides/migrate-from-composer/' | url }}"
+            title="Moving an existing composer.json to Phast"
+            class="md-button"
+          >
+            Coming from Composer?
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,17 @@
+#:schema https://phast.sh/schema/v1/manifest.json
+
+# A workspace root: it declares members rather than a package of its own, and the versions
+# they share. A member writing { workspace = true } takes its constraint from here, so the
+# two members cannot drift onto different majors of the same dependency.
+
+[workspace]
+members = ["packages/*"]
+
+[workspace.dependencies]
+"acme/markdown" = "^1.0"
+# Pinned here but required by nobody yet, so a member can opt in without choosing a version.
+"psr/log"       = "^3.0"
+
+# Pins the platform, so resolving the members needs no interpreter present.
+[config]
+platform = { php = "8.4" }

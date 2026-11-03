@@ -1,0 +1,61 @@
+description = "The generated autoloader loads classes in a real interpreter, and --no-dev changes which ones."
+tier        = "focused"
+network     = false
+php         = true
+
+# The only workflow that executes the PHP Phast writes. Everywhere else the generated
+# autoloader is asserted as text, which cannot tell a file that looks right from one an
+# interpreter accepts, and the stub's own tests drive it by hand from the source tree
+# rather than through anything Phast generated.
+#
+# What makes the dump modes assertable is that they are observable from outside: a class
+# reachable under one dump and not under another. `[autoload-dev]` is the difference the
+# probes are built around, since --no-dev is the one flag whose effect a user would
+# notice immediately and silently.
+
+# A vendor tree to regenerate against. install dumps the autoloader on its way through.
+[[step]]
+args    = ["install"]
+creates = ["vendor/autoload.php", "vendor/phast/autoload_psr4.php"]
+
+# The whole chain in one assertion: autoload.php required autoload_real.php, the static
+# maps registered the psr-4 prefix, the ClassLoader mapped it into the path package, and
+# the class was found and constructed. Text assertions cannot reach past the first step.
+[[step]]
+args   = ["run", "smoke"]
+stdout = ["<p>Hello, Phast! (╯°□°)╯︵ ┻━┻</p>"]
+
+# Dev rules are in by default, so a class only [autoload-dev] can reach still loads.
+[[step]]
+args   = ["run", "smoke-dev"]
+stdout = ["dev helper"]
+
+# Regenerating without them. autoload resolves nothing and downloads nothing: it rewrites
+# the maps from the lock and the tree already on disk.
+[[step]]
+args   = ["autoload", "--no-dev", "-v"]
+stdout = ["Autoloaded 1 packages"]
+
+# The dev class is now unreachable, and the failure arrives as a failure: the interpreter
+# cannot find the class, and `phast run` passes that exit code back rather than swallowing
+# it. A dump that merely dropped a line from a map would not prove this.
+[[step]]
+args   = ["run", "smoke-dev"]
+status = 1
+stderr = ['Class "Acme\Blog\Tests\Helper" not found']
+
+# --no-dev drops the dev rules and nothing else. Runtime dependencies stay loadable, which
+# is what makes the flag usable for a production install.
+[[step]]
+args   = ["run", "smoke"]
+stdout = ["<p>Hello, Phast! (╯°□°)╯︵ ┻━┻</p>"]
+
+# And it is reversible, so a project that dumped for production can go back without
+# reinstalling: the same command with no flag restores the dev rules from the same lock.
+[[step]]
+args   = ["autoload", "-v"]
+stdout = ["Autoloaded 1 packages"]
+
+[[step]]
+args   = ["run", "smoke-dev"]
+stdout = ["dev helper"]

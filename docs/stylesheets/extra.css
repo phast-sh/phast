@@ -1,0 +1,91 @@
+/* Phast docs theme overrides. Loaded via `extra_css` in mkdocs.yml. */
+
+/*
+ * Material sets `data-md-color-primary` / `data-md-color-scheme` attributes on
+ * the page and defines its palette variables on those attribute selectors, so
+ * plain `:root` overrides are shadowed. Overrides must target the same
+ * attribute selectors; this file loads after the theme CSS, so it wins.
+ */
+
+/*
+ * Header: deeper purple than Material's stock "deep purple", same in both schemes.
+ * Material Design deep purple shades for tuning:
+ *   300 #9575cd | 400 #7e57c2 | 500 #673ab7 | 700 #512da8 | 800 #4527a0 | 900 #311b92
+ */
+[data-md-color-primary="deep-purple"] {
+  --md-primary-fg-color: #4527a0;
+  --md-primary-fg-color--light: #673ab7;
+  --md-primary-fg-color--dark: #311b92;
+}
+
+/*
+ * Glass header: translucent primary over a blurred backdrop.
+ *
+ * Keep the mix above ~69%, or white header text over a white page falls under
+ * 4.5:1. No saturate() in the filter: it repaints the backdrop, which reopens
+ * the seam between the bar and the landing page hero.
+ */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .md-header {
+    background-color: color-mix(in srgb, var(--md-primary-fg-color) 90%, transparent);
+    -webkit-backdrop-filter: blur(0.6rem);
+    backdrop-filter: blur(0.6rem);
+  }
+
+  /*
+   * With navigation.tabs.sticky the tab bar renders inside the header, and it
+   * carries a background of its own, which would punch a solid strip through
+   * the glass it sits in.
+   */
+  .md-header .md-tabs {
+    background-color: transparent;
+  }
+}
+
+/*
+
+/*
+ * Footer: pure black in both color schemes, covering the page-navigation band
+ * (prev/next links) and the meta strip below it (copyright/social).
+ * Currently disabled; uncomment to restore the black footer.
+ */
+/*
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --md-footer-bg-color: #000000;
+  --md-footer-bg-color--dark: #000000;
+}
+*/
+
+/*
+ * Code syntax highlighting.
+ *
+ * Material colors code tokens through these variables, one set per scheme.
+ * The full list (set any of them):
+ *   --md-code-bg-color              block/inline code background
+ *   --md-code-fg-color              default code text
+ *   --md-code-hl-color              `hl_lines` line highlight
+ *   --md-code-hl-keyword-color      keywords (fn, class, return, ...)
+ *   --md-code-hl-string-color       strings
+ *   --md-code-hl-number-color       numbers
+ *   --md-code-hl-constant-color     constants
+ *   --md-code-hl-function-color     function/method names
+ *   --md-code-hl-name-color         other identifiers
+ *   --md-code-hl-operator-color     operators
+ *   --md-code-hl-punctuation-color  punctuation
+ *   --md-code-hl-comment-color      comments
+ *   --md-code-hl-special-color      escapes and special tokens
+ *   --md-code-hl-variable-color     variables (e.g. PHP $vars)
+ *   --md-code-hl-generic-color      everything else
+ */
+[data-md-color-scheme="default"] {
+  --md-code-hl-keyword-color: #4527a0;
+  --md-code-hl-function-color: #7e57c2;
+  --md-code-hl-string-color: #65aa16;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-code-hl-keyword-color: #b39ddb;
+  --md-code-hl-function-color: #9575cd;
+  --md-code-hl-string-color: #c68969;
+}

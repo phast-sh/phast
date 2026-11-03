@@ -1,0 +1,30 @@
+description = "add edits phast.toml in place, leaving the rest of the file untouched."
+tier        = "focused"
+network     = false
+
+# The manifest carries comments, an alignment style, and a section order that no
+# amount of parse-and-reserialize would preserve. Asserting the file byte for byte
+# is the point of this workflow: `snapshots/phast.toml.snap` is the whole contract.
+
+[[step]]
+args   = ["add", "symfony/console:^7.2", "--no-install"]
+stdout = ["phast.toml updated."]
+# --no-install stops after the manifest edit, so neither install artifact appears.
+absent = ["phast.lock", "vendor"]
+
+# Adding the same constraint twice is a no-op, not a duplicate entry.
+[[step]]
+args   = ["add", "symfony/console:^7.2", "--no-install"]
+stdout = ["symfony/console is already at ^7.2.", "Nothing to change."]
+
+[[step]]
+args   = ["add", "--dev", "mockery/mockery:^1.6", "--no-install"]
+stdout = ["phast.toml updated."]
+
+# The manifest is still valid, and matches the snapshot exactly: comments intact, the
+# existing alignment in [require] undisturbed, and both entries appended to the end
+# of their own section rather than sorted into it.
+[[step]]
+args    = ["validate"]
+stdout  = ["phast.toml is valid."]
+matches = true

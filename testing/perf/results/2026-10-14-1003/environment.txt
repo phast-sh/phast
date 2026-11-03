@@ -1,0 +1,8 @@
+date       2026-10-14T08:04:46Z
+machine    Darwin arm64, Apple M3 Pro
+phast      phast 0.1.0 Ai-Petri (23d9ed4)
+composer   Composer version 2.8.10 2025-07-10 19:08:33
+php        8.4.10
+runs       5
+project    koel v9.15.0 (7f9fe1a)
+project    laravel v13.10.1 (5aad4dd)

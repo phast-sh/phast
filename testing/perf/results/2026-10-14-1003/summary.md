@@ -1,0 +1,12 @@
+| Project | Scenario | Composer | Phast | Faster | Runs |
+| ------- | -------- | -------- | ----- | ------ | ---- |
+| koel    | cold     |   67.32s | 7.00s |   9.6x |    5 |
+| koel    | lock     |   17.17s | 5.20s |   3.3x |    5 |
+| koel    | warm     |    7.41s | 2.16s |   3.4x |    5 |
+| koel    | noop     |    3.12s | 0.53s |   5.9x |    5 |
+| koel    | resolve  |    5.61s | 2.06s |   2.7x |    5 |
+| laravel | cold     |    9.65s | 4.08s |   2.4x |    5 |
+| laravel | lock     |    9.43s | 3.17s |   3.0x |    5 |
+| laravel | warm     |    4.43s | 0.78s |   5.7x |    5 |
+| laravel | noop     |    1.42s | 0.21s |   6.7x |    5 |
+| laravel | resolve  |    1.71s | 0.86s |   2.0x |    5 |

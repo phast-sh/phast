@@ -1,0 +1,10 @@
+[package]
+name = "{name}"
+description = "{description}"
+type = "{type}"
+
+[require]
+php = "{php}"
+
+[config]
+platform = { php = "{platform}" }

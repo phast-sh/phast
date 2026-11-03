@@ -1,0 +1,64 @@
+description = "lock resolves, autoload consumes what it wrote, and install links the package into vendor."
+tier        = "focused"
+network     = false
+
+# The dependency is a path repository, so the whole chain runs with no registry: this is
+# the only workflow that resolves anything, and it stays offline.
+#
+# What it exists to prove is the seam between the commands. Everywhere else in the suite
+# a lock file is written by hand, which makes every reader agree with the fixture rather
+# than with the writer. Here `lock` writes one and `autoload`, `install`, `why` and `show`
+# all read that same file back.
+
+# Resolution only. The lock appears, and nothing is installed.
+[[step]]
+args    = ["lock"]
+stdout  = ["(1 packages)"]
+creates = ["phast.lock"]
+absent  = ["vendor"]
+
+# The seam, asserted before anything is installed: autoload regenerates the loader from
+# the lock file the previous step produced, with no vendor tree to read from. `vendor/acme`
+# staying absent is what separates dumping the autoloader from installing.
+#
+# Run under -v, which is where the phase timing lives: silence is the default, so the
+# package count is the only way to assert the dump happened rather than was skipped.
+[[step]]
+args    = ["autoload", "-v"]
+stdout  = ["Autoloaded 1 packages"]
+creates = [
+    "vendor/autoload.php",
+    "vendor/phast/autoload_psr4.php",
+    "vendor/phast/ClassLoader.php",
+]
+absent  = ["vendor/acme"]
+
+# Now the package arrives. Reaching a file *through* vendor/acme/markdown is what proves
+# the symlink resolves, rather than that a dangling link was created.
+[[step]]
+args    = ["install"]
+stdout  = ["Lock file is up to date."]
+creates = [
+    "vendor/acme/markdown/src/Markdown.php",
+    "vendor/composer/installed.json",
+]
+
+# Installing twice is a no-op, and says so rather than relinking silently.
+[[step]]
+args   = ["install"]
+stdout = ["Nothing to install, all packages already up to date."]
+
+# The lock read back by a different command: the root is the requirer, with the constraint
+# and section it was declared under. `1.0` rather than the `1.0.0` in the package manifest
+# is the normalized version the lock carries.
+[[step]]
+args   = ["why", "acme/markdown"]
+stdout = ["acme/markdown 1.0 is required by:", "root (your project)", "^1.0", "[require]"]
+
+# Same file, third reader, plus the generated PHP asserted byte for byte: the psr-4 prefix
+# resolved through vendor/, the loader's init suffix, and the install-path and normalized
+# version in installed.json, which is what other tooling reads to discover what is installed.
+[[step]]
+args    = ["show", "acme/markdown"]
+stdout  = ["acme/markdown", "1.0", "library"]
+matches = true

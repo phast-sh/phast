@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="124" viewBox="0 0 340 124" role="img" aria-label="Phast">
+  <style>
+    text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 18px; fill: #7fb6ae; }
+  </style>
+  <text xml:space="preserve" y="22">
+    <tspan x="8" dy="0">    ____  __               __</tspan>
+    <tspan x="8" dy="22">   / __ \/ /_  ____ ______/ /_</tspan>
+    <tspan x="8" dy="22">  / /_/ / __ \/ __ `/ ___/ __/</tspan>
+    <tspan x="8" dy="22"> / ____/ / / / /_/ (__  ) /_</tspan>
+    <tspan x="8" dy="22">/_/   /_/ /_/\__,_/____/\__/</tspan>
+  </text>
+</svg>
