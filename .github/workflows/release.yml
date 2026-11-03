@@ -33,9 +33,11 @@ jobs:
       - name: Set SOURCE_DATE_EPOCH
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> "$GITHUB_ENV"
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+      # Install the toolchain pinned in rust-toolchain.toml and add the target to it.
+      - name: Install toolchain
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
 
       # cargo-zigbuild uses zig as the linker, cross-compiling musl (both arches)
       # from the x86_64 runner without a per-arch C toolchain.
