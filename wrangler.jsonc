@@ -9,5 +9,5 @@
     { "pattern": "docs.phast.sh", "custom_domain": true }
   ],
   "workers_dev": false,
-  "preview_urls": true
+  "preview_urls": false
 }
