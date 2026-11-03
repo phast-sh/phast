@@ -6,30 +6,52 @@ description: "Install the phast binary, verify that it works, set up your shell,
 
 Phast ships as a single self-contained binary called `phast`.
 
-!!! note
-    Phast is in active development. Prebuilt binaries, an installer script, and a
-    Homebrew formula are planned; for now Phast is built from source.
+## Install
 
-## Requirements
+On Linux and macOS:
 
-- **Rust toolchain** (to build): install via [rustup](https://rustup.rs) if you do not
-  have it.
-- **PHP 8.0 or newer** (to use): the generated `vendor/autoload.php` runs on any PHP from
-  8.0 up, with no upper limit. Phast detects your PHP version and loaded extensions by
-  running the `php` binary, and uses it to execute lifecycle scripts. PHP does not need to be
-  installed to *build* Phast, and resolution can even run without PHP if you set
-  `config.platform.php` in your manifest (see [Configuration](../reference/configuration.md)).
+```console
+$ curl -fsSL https://raw.githubusercontent.com/phast-sh/phast/main/install.sh | sh
+```
+
+The script picks the build for your system (x86_64 or arm64; on Linux a static binary
+that runs on any distribution), verifies it against the release's SHA-256 checksum, and
+installs it to `~/.local/bin`. If that directory is not on your `PATH`, it prints the line
+to add to your shell profile.
+
+To choose a version or a location, set these before `sh`:
+
+| Variable            | Default            | Meaning                         |
+|---------------------|--------------------|---------------------------------|
+| `PHAST_VERSION`     | the latest release | the release tag, e.g. `v0.1.0`  |
+| `PHAST_INSTALL_DIR` | `~/.local/bin`     | where to put the `phast` binary |
+
+```console
+$ curl -fsSL https://raw.githubusercontent.com/phast-sh/phast/main/install.sh \
+    | PHAST_VERSION=v0.1.0 PHAST_INSTALL_DIR=/usr/local/bin sh
+```
 
 ## Build from source
+
+On any platform with a Rust toolchain ([rustup](https://rustup.rs)):
 
 ```console
 $ git clone https://github.com/phast-sh/phast.git
 $ cd phast
-$ cargo install --path crates/phast
+$ cargo install --locked --path crates/phast
 ```
 
-`cargo install` places the binary in `~/.cargo/bin`, which rustup adds to your `PATH` by
-default.
+rustup installs the Rust version the repository pins, and `--locked` builds with the exact
+dependency versions Phast is tested against. The binary goes to `~/.cargo/bin`, which
+rustup adds to your `PATH`.
+
+## Requirements
+
+**PHP 8.0 or newer**, to use Phast: the generated `vendor/autoload.php` runs on any PHP
+from 8.0 up, with no upper limit. Phast detects your PHP version and loaded extensions by
+running the `php` binary, and uses it to execute lifecycle scripts. Resolution can even
+run without PHP if you set `config.platform.php` in your manifest (see
+[Configuration](../reference/configuration.md)).
 
 ## Verify the installation
 
@@ -59,14 +81,7 @@ per project.
 
 ## Updating and uninstalling
 
-If you built from source, pull and reinstall:
-
-```console
-$ git -C phast pull
-$ cargo install --path phast/crates/phast --force
-```
-
-If you installed a release binary (Linux or macOS), update in place with:
+If you installed with the script, update in place:
 
 ```console
 $ phast cli update
@@ -76,8 +91,15 @@ It fetches the latest release, verifies its checksum, and atomically replaces th
 running binary; if you are already current it does nothing. See
 [`phast cli`](../reference/commands.md#phast-cli-versionupdate).
 
-Uninstall a source install with `cargo uninstall phast`, or a binary install by
-deleting it from your install directory (`~/.local/bin/phast` by default).
+If you built from source, pull and reinstall:
+
+```console
+$ git -C phast pull
+$ cargo install --locked --path phast/crates/phast --force
+```
+
+Uninstall a script install by deleting the binary from your install directory
+(`~/.local/bin/phast` by default), or a source install with `cargo uninstall phast`.
 
 ## Next steps
 
