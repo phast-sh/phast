@@ -55,7 +55,7 @@ curl -fsSL https://raw.githubusercontent.com/phast-sh/phast/main/install.sh | sh
 ```sh
 git clone https://github.com/phast-sh/phast.git
 cd phast
-cargo install --path crates/phast
+cargo install --locked --path crates/phast
 ```
 
 Verify with `phast cli version`. Update later with `phast cli update`.
