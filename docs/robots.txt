@@ -1,0 +1,5 @@
+# Everything here is public and meant to be indexed.
+User-agent: *
+Allow: /
+
+Sitemap: https://docs.phast.sh/sitemap.xml
