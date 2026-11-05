@@ -128,6 +128,8 @@ Phast's documentation is available at [docs.phast.sh](https://docs.phast.sh).
 
 The command-line reference is also available locally with `phast help`.
 
+News and release announcements are posted on the blog at [blog.phast.sh](https://blog.phast.sh).
+
 ## Status
 
 Phast is in active development. The current release is `0.1.0` **Ai-Petri**; manifest and
