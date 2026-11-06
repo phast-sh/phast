@@ -73,7 +73,6 @@ jobs:
 
   build:
     name: Build
-    if: false # disabled until release pipeline is established
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -91,7 +90,6 @@ jobs:
 
   cli-test:
     name: CLI Tests
-    if: false # disabled until release pipeline is established
     runs-on: ubuntu-latest
     needs: [build, unit-test]
     env:
@@ -111,7 +109,6 @@ jobs:
 
   e2e-test:
     name: Workflow Tests
-    if: false # disabled until release pipeline is established
     runs-on: ubuntu-latest
     needs: [build, unit-test]
     env:
@@ -143,7 +140,6 @@ jobs:
 
   autoload-test:
     name: Autoload Tests (PHP ${{ matrix.php }})
-    if: false # disabled until release pipeline is established
     runs-on: ubuntu-latest
     needs: [build, unit-test]
     env:
@@ -174,19 +170,3 @@ jobs:
 
       # The workflow needs no registry: it resolves through a path repository.
       - run: cargo test --locked -p phast-e2e-tests autoload -- --nocapture
-
-  artifact:
-    name: Artifact
-    if: false # disabled until release pipeline is established
-    runs-on: ubuntu-latest
-    needs: [cli-test, e2e-test, autoload-test]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --locked
-      - uses: actions/upload-artifact@v7
-        with:
-          name: phast
-          path: target/debug/phast
-          retention-days: 3
