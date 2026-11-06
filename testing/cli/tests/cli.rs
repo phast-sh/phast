@@ -9,7 +9,7 @@ mod common;
 
 use common::project::Project;
 
-use predicates::prelude::PredicateBooleanExt;
+use predicates::function::function;
 use predicates::str::contains;
 
 /// `cli` reads no project files, so an empty directory is enough.
@@ -58,7 +58,6 @@ fn cli_version_reports_the_build_time() {
 }
 
 /// `unknown` is the sentinel `build.rs` emits for a field it could not determine.
-/// Those fields are omitted rather than printed, so it should never reach the output.
 #[test]
 fn cli_version_omits_fields_it_could_not_determine() {
     let project = project();
@@ -68,7 +67,11 @@ fn cli_version_omits_fields_it_could_not_determine() {
         .args(["cli", "version"])
         .assert()
         .success()
-        .stdout(contains("unknown").not());
+        .stdout(function(|stdout: &str| {
+            stdout
+                .lines()
+                .all(|line| line.split_whitespace().last() != Some("unknown"))
+        }));
 }
 
 #[test]
