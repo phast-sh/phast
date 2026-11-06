@@ -105,7 +105,7 @@ jobs:
           name: phast-bin
           path: target/debug
       - run: chmod +x target/debug/phast
-      - run: cargo test --locked -p phast-cli-tests
+      - run: cargo test --locked --no-fail-fast -p phast-cli-tests
 
   e2e-test:
     name: Workflow Tests
@@ -128,13 +128,13 @@ jobs:
       # Workflows that need a registry skip themselves without PHAST_TEST_NETWORK, so this
       # step is the suite as it must pass on a machine with no network at all.
       - name: Offline workflows
-        run: cargo test --locked -p phast-e2e-tests -- --nocapture
+        run: cargo test --locked --no-fail-fast -p phast-e2e-tests -- --nocapture
 
       # The same suite with the gate open. Kept a separate step so a registry outage or a
       # new upstream release reads as this step failing, rather than as the offline
       # workflows breaking.
       - name: Workflows needing a live registry
-        run: cargo test --locked -p phast-e2e-tests -- --nocapture
+        run: cargo test --locked --no-fail-fast -p phast-e2e-tests -- --nocapture
         env:
           PHAST_TEST_NETWORK: 1
 
