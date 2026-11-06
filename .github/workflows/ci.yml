@@ -124,6 +124,14 @@ jobs:
           name: phast-bin
           path: target/debug
       - run: chmod +x target/debug/phast
+      # The workflow fixtures require php ^8.4.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      # Recorded so a green run says which interpreter it was green against.
+      - run: php --version
 
       # Workflows that need a registry skip themselves without PHAST_TEST_NETWORK, so this
       # step is the suite as it must pass on a machine with no network at all.
