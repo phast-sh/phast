@@ -8,3 +8,6 @@ type = "project"
 [require]
 php       = "^8.4"
 "psr/log" = "^1.0"
+
+[config]
+platform = { php = "8.4" }
