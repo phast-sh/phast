@@ -114,6 +114,7 @@ impl Printer {
             return Spinner {
                 progress_bar: ProgressBar::hidden(),
                 verbosity: self.verbosity,
+                _cursor: None,
             };
         }
 
@@ -126,11 +127,10 @@ impl Printer {
         progress_bar.set_message(message.to_string());
         progress_bar.enable_steady_tick(Duration::from_millis(50));
 
-        let _ = Term::stderr().hide_cursor();
-
         Spinner {
             progress_bar,
             verbosity: self.verbosity,
+            _cursor: HiddenCursor::hide(),
         }
     }
 }
@@ -151,6 +151,8 @@ pub struct Spinner {
     progress_bar: ProgressBar,
     /// Verbosity level inherited from the `Printer` that created this spinner.
     verbosity: Verbosity,
+    /// Shown again when the spinner drops; `None` when quiet or not on a terminal.
+    _cursor: Option<HiddenCursor>,
 }
 
 impl Spinner {
@@ -178,23 +180,32 @@ impl Spinner {
 
     /// Stop the spinner and clear it from the terminal.
     ///
-    /// The cursor is restored via the `Drop` impl, so it is safe to call
+    /// The cursor is restored when the spinner drops, so it is safe to call
     /// this or let the guard drop naturally, either way the cursor comes back.
     pub fn finish_and_clear(self) {
         self.progress_bar.finish_and_clear();
     }
 }
 
-impl Drop for Spinner {
-    /// Restore the terminal cursor when the spinner is dropped.
-    ///
-    /// Called automatically on both normal completion and early exit via `?`,
-    /// so the cursor is never left hidden even if a command returns an error.
-    fn drop(&mut self) {
-        if self.verbosity == Verbosity::Quiet {
-            return;
-        }
+/// The terminal cursor, hidden for as long as this lives.
+///
+/// Dropping it shows the cursor again, on normal completion and on an early exit via `?`.
+/// So a command that returns an error never leaves the cursor hidden.
+struct HiddenCursor {
+    term: Term,
+}
 
-        let _ = Term::stderr().show_cursor();
+impl HiddenCursor {
+    /// Hide the cursor on stderr. `None` when stderr is not a terminal: written to a pipe
+    /// or a CI log, the escape codes would land in the output as text.
+    fn hide() -> Option<Self> {
+        let term = Term::stderr();
+        (term.is_term() && term.hide_cursor().is_ok()).then(|| Self { term })
+    }
+}
+
+impl Drop for HiddenCursor {
+    fn drop(&mut self) {
+        let _ = self.term.show_cursor();
     }
 }
