@@ -607,7 +607,9 @@ fn add_reports_a_missing_manifest_before_looking_for_a_workspace() {
         .args(["add", "psr/log"])
         .assert()
         .failure()
-        .stderr(contains("phast.toml not found"));
+        .stderr(contains("phast.toml not found"))
+        .stderr(contains("phast migrate"))
+        .stderr(contains("phast init"));
 }
 
 #[tokio::test]
