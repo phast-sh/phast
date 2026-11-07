@@ -131,6 +131,19 @@ async fn lock_writes_the_lock_without_downloading() {
 }
 
 #[tokio::test]
+async fn lock_writes_no_cursor_codes_to_a_pipe() {
+    let registry = registry().await;
+    let project = project();
+
+    project
+        .cmd()
+        .args(["lock", "--registry-url", &registry.uri()])
+        .assert()
+        .success()
+        .stderr(contains("\x1b[?25").not());
+}
+
+#[tokio::test]
 async fn lock_records_the_resolved_packages() {
     let registry = registry().await;
     let project = project();
