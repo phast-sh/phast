@@ -57,7 +57,8 @@ pub fn phast_toml_exists() -> &'static str {
 
 /// phast.toml was not found in the current directory.
 pub fn phast_toml_not_found() -> &'static str {
-    "phast.toml not found. Run `phast init` first."
+    "phast.toml not found. Run `phast migrate` to create it from composer.json. \
+    Run `phast init` to start a new one."
 }
 
 /// phast.lock was not found in the current directory.
