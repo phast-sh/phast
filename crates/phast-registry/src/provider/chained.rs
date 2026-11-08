@@ -225,17 +225,26 @@ impl ChainedProvider {
 /// its pinned provider, everything else is tried against the fallback chain in declaration order.
 #[rustfmt::skip]
 impl Provider for ChainedProvider {
-    /// Return all known versions of `name` from the first provider that returns a
-    /// non-empty list.
+    /// Return all known versions of `name` from the first provider that carries it.
     ///
-    /// A provider with no versions is passed over, but one that fails stops the lookup with
-    /// its error. Moving on would let a later repository answer for a package an earlier
-    /// one owns, whenever the earlier one is down or refused, and would report the failure
-    /// as an unknown package.
+    /// A provider that does not have the package is passed over, but one that fails stops
+    /// the lookup with its error. Moving on would let a later repository answer for a
+    /// package an earlier one owns, whenever the earlier one is down or refused, and would
+    /// report the failure as an unknown package.
+    ///
+    /// A registry whose filters rejected every version still carries the package, so the
+    /// lookup stops there with an empty list. Moving on would install a same-named package
+    /// from a later repository whenever a filter, `minimum-package-age` among them, holds
+    /// back every release the owner has.
     async fn versions(&self, name: &PackageName) -> anyhow::Result<Vec<Version>> {
         for (position, provider) in self.router.route(name).iter().enumerate() {
             let versions = provider.versions(name).await?;
-            if !versions.is_empty() {
+            let filtered_out = matches!(
+                provider,
+                RoutedProvider::Registry(registry) if registry.rejected(name)
+            );
+
+            if !versions.is_empty() || filtered_out {
                 self.router.found(name, position);
                 return Ok(versions);
             }
