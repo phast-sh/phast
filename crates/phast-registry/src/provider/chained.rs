@@ -239,12 +239,12 @@ impl Provider for ChainedProvider {
     async fn versions(&self, name: &PackageName) -> anyhow::Result<Vec<Version>> {
         for (position, provider) in self.router.route(name).iter().enumerate() {
             let versions = provider.versions(name).await?;
-            let filtered_out = matches!(
+            let filtered = matches!(
                 provider,
-                RoutedProvider::Registry(registry) if registry.rejected(name)
+                RoutedProvider::Registry(registry) if registry.rejected(name),
             );
 
-            if !versions.is_empty() || filtered_out {
+            if !versions.is_empty() || filtered {
                 self.router.found(name, position);
                 return Ok(versions);
             }
