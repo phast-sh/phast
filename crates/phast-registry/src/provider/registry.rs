@@ -127,6 +127,15 @@ impl RegistryProvider {
         }
     }
 
+    /// Replace the cache wholesale, `cache` being used exactly as handed over.
+    ///
+    /// That includes its host scoping, so a cache built without one drops the
+    /// per-registry `metadata/{host}/` split that [`new`](Self::new) sets up.
+    pub fn with_cache(mut self, cache: Cache) -> Self {
+        self.cache = cache;
+        self
+    }
+
     /// Every package a lookup rejected versions of, with the versions and why.
     pub fn rejections(&self) -> Vec<(PackageName, Vec<(Version, Rejection)>)> {
         self.rejections
@@ -135,13 +144,10 @@ impl RegistryProvider {
             .collect()
     }
 
-    /// Replace the cache wholesale, `cache` being used exactly as handed over.
-    ///
-    /// That includes its host scoping, so a cache built without one drops the
-    /// per-registry `metadata/{host}/` split that [`new`](Self::new) sets up.
-    pub fn with_cache(mut self, cache: Cache) -> Self {
-        self.cache = cache;
-        self
+    /// Whether the last lookup of `name` rejected any of its versions, so this registry
+    /// carries the package even when it offers none of them.
+    pub fn rejected(&self, name: &PackageName) -> bool {
+        self.rejections.contains_key(name)
     }
 
     /// Produce a `PackageDef` for the given `name` and `version` from cached metadata.
