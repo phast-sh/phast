@@ -234,4 +234,10 @@ async fn remove_installs_against_the_edited_manifest() {
         "the removed package is still locked",
     );
     assert!(project.read("phast.lock").contains("vendor/package-a"));
+
+    assert!(
+        !project.root().join("vendor/vendor/package-c").exists(),
+        "the removed package is still in vendor/",
+    );
+    assert!(project.root().join("vendor/vendor/package-a").is_dir());
 }

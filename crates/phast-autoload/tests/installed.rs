@@ -1,10 +1,42 @@
-use phast_autoload::installed::Installed;
+use phast_autoload::installed::{self, Installed};
 use phast_core::lock::phast::{
     DistSection, DistType, ExtraSection, MetadataSection, PackageDef, PhastLock, SourceRef,
 };
 use phast_core::manifest::VcsType;
+use phast_core::package::PackageName;
 
+use indoc::indoc;
 use tempfile::TempDir;
+
+/// The record Composer 2 writes: the list under `packages`, beside Composer's own `__root__`.
+const COMPOSER_2_RECORD: &str = indoc! {r#"
+    {
+        "packages": [
+            {"name": "__root__"},
+            {"name": "vendor/a"}
+        ],
+        "dev": true
+    }
+"#};
+
+/// The record Composer 1 wrote: the bare list.
+const COMPOSER_1_RECORD: &str = indoc! {r#"
+    [
+        {"name": "vendor/a"}
+    ]
+"#};
+
+/// A record naming paths that would leave their own directory once joined onto `vendor/`.
+const UNSAFE_RECORD: &str = indoc! {r#"
+    {
+        "packages": [
+            {"name": "__root__"},
+            {"name": "../src"},
+            {"name": "vendor/../../etc"},
+            {"name": "vendor/a"}
+        ]
+    }
+"#};
 
 /// A lock with no packages of either kind and no root autoload rules.
 fn lock() -> PhastLock {
@@ -419,4 +451,54 @@ fn read_installed_php(tmp: &TempDir) -> String {
 fn read_installed_json(tmp: &TempDir) -> serde_json::Value {
     let raw = std::fs::read_to_string(tmp.path().join("composer/installed.json")).unwrap();
     serde_json::from_str(&raw).unwrap()
+}
+
+// ---------------------------------------------------------------------------
+// installed.json: reading back what was recorded
+// ---------------------------------------------------------------------------
+
+#[test]
+fn written_reads_the_names_composer_2_wrote() {
+    let tmp = vendor(COMPOSER_2_RECORD);
+
+    assert_eq!(installed::written(tmp.path()), names(&["vendor/a"]));
+}
+
+#[test]
+fn written_reads_the_bare_array_composer_1_wrote() {
+    let tmp = vendor(COMPOSER_1_RECORD);
+
+    assert_eq!(installed::written(tmp.path()), names(&["vendor/a"]));
+}
+
+#[test]
+fn written_is_empty_without_a_readable_record() {
+    let empty = TempDir::new().unwrap();
+    assert!(installed::written(empty.path()).is_empty());
+
+    let unreadable = vendor("not json");
+    assert!(installed::written(unreadable.path()).is_empty());
+}
+
+#[test]
+fn written_drops_a_name_that_is_not_vendor_package() {
+    let tmp = vendor(UNSAFE_RECORD);
+
+    assert_eq!(installed::written(tmp.path()), names(&["vendor/a"]));
+}
+
+/// A `vendor/` directory whose `composer/installed.json` holds `json`.
+fn vendor(json: &str) -> TempDir {
+    let tmp = TempDir::new().unwrap();
+    std::fs::create_dir_all(tmp.path().join("composer")).unwrap();
+    std::fs::write(tmp.path().join("composer/installed.json"), json).unwrap();
+    tmp
+}
+
+/// The names as `PackageName`s, the shape `written` returns.
+fn names(values: &[&str]) -> Vec<PackageName> {
+    values
+        .iter()
+        .map(|value| PackageName::new(*value))
+        .collect()
 }
