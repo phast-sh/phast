@@ -54,6 +54,5 @@ commit_parsers = [
 [bump]
 # Before 1.0, a feature bumps the patch and a breaking change the minor, rather than
 # git-cliff's minor and 1.0.0. No effect from 1.0 on.
-# While on 0.x: feature → patch, breaking → minor (git-cliff's default: minor, 1.0.0).
 features_always_bump_minor = false
 breaking_always_bump_major = false
