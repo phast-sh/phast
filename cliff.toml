@@ -1,7 +1,7 @@
 # How `git cliff` turns commit subjects into CHANGELOG.md entries.
 #
-# Only features, fixes and breaking changes are listed: the rest (docs, tests, ci, chores,
-# refactors) changes nothing a user runs.
+# Only features, fixes and breaking changes are listed: the rest
+# (docs, tests, ci, chores, refactors) changes nothing a user runs.
 
 [changelog]
 header = """
