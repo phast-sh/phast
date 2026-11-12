@@ -155,7 +155,7 @@ impl VcsProvider {
             name: expected.clone(),
             url: url.to_owned(),
             host,
-            candidates: vec![Candidate { version, reference }],
+            candidates: vec![Candidate::new(version, reference).with_manifest(manifest)],
         })
     }
 
@@ -165,13 +165,11 @@ impl VcsProvider {
     /// `time` holds the commit's date when the host reports one, and is left out
     /// when it does not, since an install is not worth losing over a timestamp.
     async fn locked(&self, version: &Version) -> anyhow::Result<PackageDef> {
-        let reference = &self
-            .candidate_for(version)?
-            .reference;
-        let manifest = manifest_at(
-            &self.host,
-            &reference.commit,
-        ).await?;
+        let candidate = self.candidate_for(version)?;
+        let reference = &candidate.reference;
+        let manifest  = candidate
+            .manifest(&self.host)
+            .await?;
 
         // The ref's own version: a tag number, or `dev-{branch}` for a branch
         // and for an aliased branch (not the alias's sentinel-expanded numeric).
@@ -291,10 +289,9 @@ impl Provider for VcsProvider {
         version: &Version,
     ) -> anyhow::Result<PackageMetadata> {
         let candidate = self.candidate_for(version)?;
-        let manifest  = manifest_at(
-            &self.host,
-            &candidate.reference.commit,
-        ).await?;
+        let manifest  = candidate
+            .manifest(&self.host)
+            .await?;
 
         // Resolve the ref's require/replace/provide specs against the resolved version,
         // so a git package's declarations are honored exactly like a registry one's.

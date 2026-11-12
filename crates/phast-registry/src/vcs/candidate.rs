@@ -1,10 +1,15 @@
 //! Turning a repository's refs and manifest into the versions it offers.
 
-use super::{RefKind, VcsRef};
+use super::{RefKind, VcsHost, VcsRef, manifest_at};
+
+use std::sync::Arc;
 
 use phast_core::manifest::Manifest;
 use phast_version::parser::parse_branch_alias;
 use phast_version::{Stability, Version};
+
+use anyhow::Result;
+use tokio::sync::OnceCell;
 
 /// A version the repository offers, paired with the git ref that serves it: a tag
 /// or branch under its own version, or a branch under a `branch-alias` dev version.
@@ -18,10 +23,39 @@ pub struct Candidate {
     /// aliased branch locks as `dev-{branch}` the way Composer writes it, not under
     /// the alias's sentinel-expanded numeric.
     pub reference: VcsRef,
+    /// The manifest at `reference.commit`, read once and then kept. A commit never
+    /// changes, so it never goes stale. Clones of the provider share it.
+    manifest: Arc<OnceCell<Manifest>>,
 }
 
 #[rustfmt::skip]
 impl Candidate {
+    /// A candidate whose manifest has not been read yet.
+    pub fn new(version: Version, reference: VcsRef) -> Self {
+        Self {
+            version,
+            reference,
+            manifest: Arc::default(),
+        }
+    }
+
+    /// Attach a manifest that was already read, so it isn't fetched again. A pin uses
+    /// this, since it reads the manifest to check the package name.
+    pub fn with_manifest(mut self, manifest: Manifest) -> Self {
+        self.manifest = Arc::new(OnceCell::from(manifest));
+        self
+    }
+
+    /// The manifest at this candidate's commit, fetched from `host` the first time.
+    ///
+    /// If several callers ask at once, only one fetches. A failed fetch isn't kept,
+    /// and the next call tries again.
+    pub async fn manifest(&self, host: &impl VcsHost) -> Result<&Manifest> {
+        self.manifest
+            .get_or_try_init(|| manifest_at(host, &self.reference.commit))
+            .await
+    }
+
     /// The versions a repository offers: one candidate per tag and branch, plus the
     /// dev versions branches present as via `extra.branch-alias`.
     ///
@@ -41,10 +75,7 @@ impl Candidate {
         references
             .into_iter()
             .filter_map(|reference| {
-                Some(Candidate {
-                    version: reference.version()?,
-                    reference,
-                })
+                Some(Candidate::new(reference.version()?, reference))
             })
             .chain(aliases)
             .collect()
@@ -102,10 +133,10 @@ impl Candidate {
                 continue
             };
 
-            aliases.push(Candidate {
-                version: Version::Numeric(version),
-                reference: reference.clone(),
-            });
+            aliases.push(Candidate::new(
+                Version::Numeric(version),
+                reference.clone(),
+            ));
         }
         aliases
     }

@@ -662,3 +662,52 @@ async fn locking_another_name_is_an_error() {
     assert!(error.contains("acme/widget"), "got: {error}");
     assert!(error.contains("someone/else"), "got: {error}");
 }
+
+// ---------------------------------------------------------------------------
+// Reading each commit's manifest once
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn each_commit_manifest_is_fetched_once() {
+    let server = MockServer::start().await;
+    let provider = discovered(&server, MANIFEST, Stability::Stable).await;
+
+    let name = provider.name().clone();
+    let version = parse_version("1.0.0").unwrap();
+
+    let full_pass = provider.clone();
+    let prod_pass = provider.clone();
+
+    full_pass.metadata(&name, &version).await.unwrap();
+    prod_pass.metadata(&name, &version).await.unwrap();
+    provider.lock(&name, &version).await.unwrap();
+
+    let fetched = server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|request| request.url.path() == "/acme/widget/c1/composer.json")
+        .count();
+    assert_eq!(fetched, 1);
+}
+
+#[tokio::test]
+async fn a_pin_reuses_the_manifest_it_read() {
+    let server = MockServer::start().await;
+    let provider = pinned(&server, MANIFEST, GitRef::Tag("v1.0.0".to_owned())).await;
+
+    let name = provider.name().clone();
+    let version = parse_version("1.0.0").unwrap();
+
+    provider.metadata(&name, &version).await.unwrap();
+
+    let fetched = server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|request| request.url.path() == "/acme/widget/c1/composer.json")
+        .count();
+    assert_eq!(fetched, 1);
+}
