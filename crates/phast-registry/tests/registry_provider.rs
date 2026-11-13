@@ -631,6 +631,47 @@ async fn replace_and_provide_specs_resolve_to_the_package_version() {
 }
 
 #[tokio::test]
+async fn require_specs_resolve_to_the_package_version() {
+    let server = MockServer::start().await;
+    discovery(&server, METADATA_URL).await;
+
+    // laravel/framework@11.0.0 requires illuminate/auth at self.version: the
+    // sentinel binds to 11.0.0, exactly like the replace/provide ones.
+    serve(
+        &server,
+        "/p2/laravel/framework.json",
+        json!({ "packages": { "laravel/framework": [{
+            "version": "11.0.0",
+            "require": { "illuminate/auth": "self.version", "psr/log": "^1.0" },
+        }]}}),
+    )
+    .await;
+    absent(&server, "/p2/laravel/framework~dev.json").await;
+
+    let tmp = TempDir::new().unwrap();
+    let provider = provider(&server, tmp.path(), options());
+    let name = PackageName::new("laravel/framework");
+    let version = parser::parse_version("11.0.0").unwrap();
+    let mut meta = provider.metadata(&name, &version).await.unwrap();
+
+    // The raw map iterates unordered, so sort by name before comparing.
+    meta.require.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
+    assert_eq!(
+        meta.require,
+        vec![
+            (
+                PackageName::new("illuminate/auth"),
+                phast_version::Constraint::Exact(version.clone()),
+            ),
+            (
+                PackageName::new("psr/log"),
+                parser::parse_requirement("^1.0").unwrap().0
+            ),
+        ],
+    );
+}
+
+#[tokio::test]
 async fn metadata_for_a_version_the_registry_never_published_is_an_error() {
     let server = MockServer::start().await;
     discovery(&server, METADATA_URL).await;

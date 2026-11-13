@@ -556,8 +556,8 @@ impl Provider for RegistryProvider {
         Ok(PackageMetadata {
             name: name.clone(),
             version: version.clone(),
-            require: convert_dependency_map(&pkg.require)?,
-            require_dev: convert_dependency_map(&pkg.require_dev)?,
+            require: convert_dependency_map(&pkg.require, version)?,
+            require_dev: convert_dependency_map(&pkg.require_dev, version)?,
             provide,
             replace,
         })

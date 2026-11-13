@@ -8,8 +8,7 @@ use std::collections::HashMap;
 
 use phast_core::lock::phast::{AutoloadSection, ExtraSection};
 use phast_core::package::PackageName;
-use phast_version::parser::parse_constraint;
-use phast_version::{Constraint, Stability, Version};
+use phast_version::{Constraint, RequireSpec, Stability, Version};
 
 use anyhow::Context;
 use serde_json::Value as JsonValue;
@@ -37,16 +36,20 @@ pub(crate) fn split_package_name(name: &PackageName) -> (&str, &str) {
 
 /// Convert a raw dependency map (package name -> constraint string) into typed pairs.
 ///
+/// Each value parses as a [`RequireSpec`] and resolves against `declaring`, so a
+/// registry package's `self.version` requirement binds to the version being served.
 /// Returns an error if any constraint string does not parse, naming the constraint
 /// and the package that declared it.
 pub(crate) fn convert_dependency_map(
     raw: &HashMap<String, String>,
+    declaring: &Version,
 ) -> anyhow::Result<Vec<(PackageName, Constraint)>> {
     raw.iter()
         .map(|(name, constraint)| {
-            let constraint = parse_constraint(constraint)
+            let spec = constraint
+                .parse::<RequireSpec>()
                 .with_context(|| format!("invalid constraint '{constraint}' for '{name}'"))?;
-            Ok((PackageName::new(name), constraint))
+            Ok((PackageName::new(name), spec.resolve(declaring)))
         })
         .collect()
 }

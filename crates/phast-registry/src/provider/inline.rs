@@ -9,8 +9,8 @@ use phast_core::lock::phast::{DistSection, ExtraSection, PackageDef, SourceRef};
 use phast_core::manifest::VcsType;
 use phast_core::package::PackageName;
 use phast_resolver::provider::{PackageMetadata, Provider};
-use phast_version::parser::{parse_constraint, parse_declared_version};
-use phast_version::{Constraint, Version};
+use phast_version::parser::parse_declared_version;
+use phast_version::{Constraint, RequireSpec, Version};
 
 use anyhow::Context;
 use serde_json::Value as JsonValue;
@@ -69,7 +69,7 @@ impl InlineProvider {
             .with_context(|| format!("inline package '{}' declares no version", package_name.as_str()))?;
         let version = parse_declared_version(version)
             .with_context(|| format!("invalid version for inline package '{}'", package_name.as_str()))?;
-        let require = inline_require(package.get("require"))?;
+        let require = inline_require(package.get("require"), &version)?;
 
         let src = package
             .get("source");
@@ -168,8 +168,12 @@ impl Lockable for InlineProvider {
     }
 }
 
-/// Parse an inline package's `require` map into resolved constraints.
-fn inline_require(value: Option<&JsonValue>) -> anyhow::Result<Vec<(PackageName, Constraint)>> {
+/// Parse an inline package's `require` map into constraints resolved against
+/// `declaring`, so a `self.version` requirement binds to the declared version.
+fn inline_require(
+    value: Option<&JsonValue>,
+    declaring: &Version,
+) -> anyhow::Result<Vec<(PackageName, Constraint)>> {
     let Some(map) = value.and_then(JsonValue::as_object) else {
         return Ok(vec![]);
     };
@@ -179,7 +183,10 @@ fn inline_require(value: Option<&JsonValue>) -> anyhow::Result<Vec<(PackageName,
             let _c = constraint
                 .as_str()
                 .with_context(|| format!("require constraint for '{name}' must be a string"))?;
-            Ok((PackageName::new(name), parse_constraint(_c)?))
+            let spec = _c
+                .parse::<RequireSpec>()
+                .with_context(|| format!("invalid constraint '{_c}' for '{name}'"))?;
+            Ok((PackageName::new(name), spec.resolve(declaring)))
         })
         .collect()
 }
