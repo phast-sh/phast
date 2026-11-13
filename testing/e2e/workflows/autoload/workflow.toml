@@ -25,6 +25,11 @@ creates = ["vendor/autoload.php", "vendor/phast/autoload_psr4.php"]
 args   = ["run", "smoke"]
 stdout = ["<p>Hello, Phast! (╯°□°)╯︵ ┻━┻</p>"]
 
+# The loader lists itself under the vendor dir, as Composer's does.
+[[step]]
+args   = ["run", "registered-loaders"]
+stdout = ["vendor true"]
+
 # Dev rules are in by default, so a class only [autoload-dev] can reach still loads.
 [[step]]
 args   = ["run", "smoke-dev"]

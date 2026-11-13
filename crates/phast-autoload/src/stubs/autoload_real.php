@@ -46,7 +46,7 @@ class {init_class}
             \Composer\InstalledVersions::reload(require __DIR__ . '/installed.php');
         }
 
-        $loader = new \Phast\Autoload\ClassLoader();
+        $loader = new \Phast\Autoload\ClassLoader(\dirname(__DIR__));
         $loader->setClassMapAuthoritative({authoritative});
         $loader->register(true);
         self::$loader = $loader;
