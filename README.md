@@ -134,6 +134,7 @@ News and release announcements are posted on the blog at [blog.phast.sh](https:/
 
 Phast is in active development. The current release is `0.1.0` **Ai-Petri**; manifest and
 lock formats may still change before `1.0`. Feedback and issues are very welcome.
+Pull requests are not accepted yet. Please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security
 
