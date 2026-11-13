@@ -280,6 +280,30 @@ async fn a_replaced_package_is_dropped_even_when_the_registry_serves_it() {
     assert!(!solution.contains_key(&package("illuminate/auth")));
 }
 
+#[tokio::test]
+async fn a_package_that_replaces_itself_still_resolves() {
+    let mut provider = MemoryProvider::new();
+    provider.add_package_full(
+        "barryvdh/laravel-debugbar",
+        stable(4, 4, 5),
+        vec![],
+        vec![],
+        vec![("barryvdh/laravel-debugbar".to_owned(), stable(4, 4, 5))],
+    );
+
+    let solution = run(
+        provider,
+        vec![requirement("barryvdh/laravel-debugbar", "^4.0")],
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        solution[&package("barryvdh/laravel-debugbar")],
+        stable(4, 4, 5),
+    );
+}
+
 // ---------------------------------------------------------------------------
 // A virtual package the root itself satisfies
 // ---------------------------------------------------------------------------
