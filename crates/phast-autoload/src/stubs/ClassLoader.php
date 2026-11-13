@@ -61,6 +61,18 @@ class ClassLoader
      */
     private array $missingClasses = [];
 
+    /**
+     * @var array<string, self> vendor dir -> registered loader
+     */
+    private static array $registeredLoaders = [];
+
+    /**
+     * @param string|null $vendorDir Key under which getRegisteredLoaders() lists this loader.
+     */
+    public function __construct(private ?string $vendorDir = null)
+    {
+    }
+
     // -------------------------------------------------------------------------
     // Registration
     // -------------------------------------------------------------------------
@@ -73,6 +85,17 @@ class ClassLoader
     public function register(bool $prepend = false): void
     {
         spl_autoload_register([$this, 'loadClass'], true, $prepend);
+
+        if ($this->vendorDir === null) {
+            return;
+        }
+
+        if ($prepend) {
+            self::$registeredLoaders = [$this->vendorDir => $this] + self::$registeredLoaders;
+        } else {
+            unset(self::$registeredLoaders[$this->vendorDir]);
+            self::$registeredLoaders[$this->vendorDir] = $this;
+        }
     }
 
     /**
@@ -81,6 +104,21 @@ class ClassLoader
     public function unregister(): void
     {
         spl_autoload_unregister([$this, 'loadClass']);
+
+        if ($this->vendorDir !== null) {
+            unset(self::$registeredLoaders[$this->vendorDir]);
+        }
+    }
+
+    /**
+     * Registered loaders keyed by vendor dir, most recently prepended first.
+     * Laravel reads the first key to infer the application base path.
+     *
+     * @return array<string, self>
+     */
+    public static function getRegisteredLoaders(): array
+    {
+        return self::$registeredLoaders;
     }
 
     // -------------------------------------------------------------------------

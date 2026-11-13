@@ -16,7 +16,7 @@ url  = "packages/markdown"
 [autoload-dev.psr-4]
 "Acme\\Blog\\Tests\\" = ["tests/"]
 
-# Two probes, each loading one class through the generated autoloader. They are the
+# Probes, each loading one class through the generated autoloader. They are the
 # assertions: what a dump contains is only interesting if it changes what PHP can load.
 #
 # Written as TOML literal strings so the PHP reads as PHP: a basic string would need every
@@ -35,5 +35,16 @@ smoke-dev = '''
     require 'vendor/autoload.php';
 
     echo (new Acme\Blog\Tests\Helper())->name();
+    echo PHP_EOL;
+"'''
+
+# Laravel infers the base path from the first key of getRegisteredLoaders(). The `\$` keeps
+# the variable away from `sh -c`.
+registered-loaders = '''
+@php -r "
+    \$loader = require 'vendor/autoload.php';
+    \$loaders = Composer\Autoload\ClassLoader::getRegisteredLoaders();
+
+    echo basename(array_key_first(\$loaders)), ' ', var_export(reset(\$loaders) === \$loader, true);
     echo PHP_EOL;
 "'''
