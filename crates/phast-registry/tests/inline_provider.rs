@@ -146,6 +146,20 @@ async fn metadata_repeats_the_requires_the_spec_declared() {
 }
 
 #[tokio::test]
+async fn a_self_version_require_resolves_to_the_declared_version() {
+    let mut spec = spec();
+    spec["require"] = json!({ "acme/widget": "self.version" });
+    let provider = provider(&spec);
+    let versions = provider.versions(&name()).await.unwrap();
+
+    let metadata = provider.metadata(&name(), &versions[0]).await.unwrap();
+    assert_eq!(
+        requires(&metadata.require),
+        [format!("acme/widget:{VERSION}")]
+    );
+}
+
+#[tokio::test]
 async fn versions_are_empty_for_a_name_the_provider_does_not_serve() {
     let provider = provider(&spec());
 
