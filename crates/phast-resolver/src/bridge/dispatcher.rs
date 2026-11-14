@@ -9,8 +9,9 @@
 //! before PubGrub asks for them.
 
 use crate::bridge::virtual_registry::VirtualRegistry;
-use crate::bridge::{BridgeReceiver, ProviderRequest, ProviderResponse, SharedObservations};
+use crate::bridge::{BridgeReceiver, ProviderRequest, ProviderResponse};
 use crate::provider::Provider;
+use crate::resolution::round::SharedObservations;
 
 use phast_core::package::PackageName;
 use phast_version::{Constraint, Version};

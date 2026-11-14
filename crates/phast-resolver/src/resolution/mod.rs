@@ -5,6 +5,8 @@
 //! hashes; those are filled in by `phast-registry` during the lock file generation
 //! that follows resolution.
 
+pub(crate) mod round;
+
 use std::collections::{HashMap, HashSet};
 
 use phast_core::package::PackageName;

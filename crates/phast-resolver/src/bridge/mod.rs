@@ -13,36 +13,12 @@ pub mod virtual_registry;
 
 use crate::provider::PackageMetadata;
 
-use std::collections::{HashMap, HashSet};
 use std::sync::mpsc as sync_mpsc;
-use std::sync::{Arc, Mutex};
 
 use phast_core::package::PackageName;
 use phast_version::Version;
 
 use tokio::sync::mpsc as async_mpsc;
-
-/// Facts the solve discovers as metadata streams in, recorded for `run_solve` to
-/// apply once PubGrub finishes. Shared between the dependency provider (which
-/// marks virtuals) and the dispatcher (which records replaces), since both run
-/// concurrently with the solve but the decisions are made after it.
-#[derive(Default)]
-pub struct SolveObservations {
-    /// Packages confirmed absent from every registry: candidates for virtual
-    /// satisfaction via `provide`, and filtered from the final resolution.
-    pub virtual_packages: HashSet<PackageName>,
-    /// Replaced package -> the packages that declare they replace it. A resolved
-    /// package replaced by another resolved package is dropped from the output.
-    pub replaced_by: HashMap<PackageName, Vec<PackageName>>,
-    /// Virtual package -> the packages that declare they provide it. Read after the
-    /// solve: a typo and an interface like `psr/log-implementation` are both absent
-    /// from every registry, and this is what tells them apart.
-    pub provided_by: HashMap<PackageName, Vec<PackageName>>,
-}
-
-// TODO: worth extracting into an Observer of its own.
-/// Shared handle to the [`SolveObservations`] for one solve.
-pub type SharedObservations = Arc<Mutex<SolveObservations>>;
 
 /// A request sent from the PubGrub thread to the dispatcher.
 pub enum ProviderRequest {
