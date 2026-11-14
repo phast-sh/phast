@@ -283,7 +283,7 @@ impl pubgrub::DependencyProvider for PubGrubAdapter {
     ) -> Result<Dependencies<PubGrubPackage, Ranges<Version>, String>, ResolveError> {
         match package {
             PubGrubPackage::Root if version == &self.root_version => {
-                Ok(Dependencies::Available(self.root_deps.clone()))
+                Ok(Dependencies::Available(by_name(self.root_deps.clone())))
             }
             PubGrubPackage::Root => {
                 Ok(Dependencies::Unavailable("unknown root version".into()))
@@ -317,18 +317,31 @@ impl pubgrub::DependencyProvider for PubGrubAdapter {
                 let constraints = meta
                     .require
                     .iter()
-                    .map(|(dep_name, constraint)| {
+                    .map(|(name, constraint)| {
                         (
-                            PubGrubPackage::Package(dep_name.clone()),
+                            PubGrubPackage::Package(name.clone()),
                             constraint_to_range(constraint),
                         )
-                    })
-                    .collect::<DependencyConstraints<_, _>>();
+                    });
 
-                Ok(Dependencies::Available(constraints))
+                Ok(Dependencies::Available(by_name(constraints)))
             }
         }
     }
+}
+
+/// `dependencies` in package-name order.
+///
+/// The solver breaks ties between equally ranked packages by the order it first saw them.
+/// Dependency lists don't arrive in a fixed order, so without sorting, the same project
+/// could resolve differently from one run to the next.
+fn by_name(
+    dependencies: impl IntoIterator<Item = (PubGrubPackage, Ranges<Version>)>,
+) -> DependencyConstraints<PubGrubPackage, Ranges<Version>> {
+    let mut dependencies: Vec<_> = dependencies.into_iter().collect();
+
+    dependencies.sort_by(|(a, _), (b, _)| a.cmp(b));
+    dependencies.into_iter().collect()
 }
 
 /// The package type used by PubGrub internally.
@@ -339,7 +352,7 @@ impl pubgrub::DependencyProvider for PubGrubAdapter {
 ///
 /// Using an enum (rather than a magic string) makes it impossible to collide
 /// with a real package name and lets filtering use a pattern match.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PubGrubPackage {
     /// Synthetic root package carrying the project's direct requirements.
     Root,
