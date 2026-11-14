@@ -17,9 +17,8 @@
 //! there are none, a placeholder version derived from the constraint range is returned
 //! so PubGrub never gets stuck on a virtual package.
 
-use crate::bridge::{BridgeSender, ProviderRequest, ProviderResponse};
+use crate::bridge::{BridgeSender, ProviderRequest, ProviderResponse, SharedObservations};
 use crate::ranges::{constraint_to_range, range_to_version};
-use crate::resolution::round::SharedObservations;
 use crate::resolver::ResolveError;
 
 use std::cmp::Reverse;
