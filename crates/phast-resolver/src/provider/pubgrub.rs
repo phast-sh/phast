@@ -11,9 +11,11 @@
 //! When no provider serves a package, the dispatcher returns `VirtualVersions`.
 //! The provider marks it virtual (in the shared observations) and assigns it the lowest
 //! possible priority so that real packages (and their `provide` declarations) are processed
-//! first. On subsequent `choose_version` calls the dispatcher may now have synthetic
-//! versions from the provides_index; if not, a placeholder version derived from
-//! the constraint range is returned so PubGrub never gets stuck on a virtual package.
+//! first. Each package is asked about as soon as it shows up, so a virtual one is ranked
+//! last from the start. Its versions aren't cached: they're rebuilt from the providers
+//! read so far, which by then includes every provider the real packages declared. If
+//! there are none, a placeholder version derived from the constraint range is returned
+//! so PubGrub never gets stuck on a virtual package.
 
 use crate::bridge::{BridgeSender, ProviderRequest, ProviderResponse};
 use crate::ranges::{constraint_to_range, range_to_version};
@@ -44,9 +46,8 @@ pub struct PubGrubAdapter {
     root_deps: DependencyConstraints<PubGrubPackage, Ranges<Version>>,
     /// Cache of available versions per package, fetched on first access.
     ///
-    /// Only a non-empty answer is stored, so a package that came back with nothing
-    /// is asked again rather than remembered as absent. A virtual package carrying
-    /// synthetic versions is cached like any other.
+    /// A virtual package is never stored, since its list grows dynamically as more
+    /// providers are read.
     versions_cache: Mutex<HashMap<PackageName, Vec<Version>>>,
     /// Solve observations shared with the resolver and dispatcher. This provider
     /// writes `virtual_packages` (those no provider serves) into it; the resolver
@@ -91,14 +92,37 @@ impl PubGrubAdapter {
         }
     }
 
+    /// Whether `name` has been asked about already: its versions are cached, or it's a virtual package.
+    #[rustfmt::skip]
+    fn is_known(&self, name: &PackageName) -> bool {
+        let cached_version = self
+            .versions_cache
+            .lock()
+            .unwrap()
+            .contains_key(name);
+
+        let virtual_package = self
+            .observations
+            .lock()
+            .unwrap()
+            .virtual_packages
+            .contains(name);
+
+        cached_version || virtual_package
+    }
+
     /// Fetch available versions for `name` from the dispatcher, returning the cached result on repeat calls.
     #[rustfmt::skip]
     fn fetch_versions(&self, name: &PackageName) -> Result<Vec<Version>, ResolveError> {
-        // Only serve from cache when we have a real (non-empty) result.
-        if let Some(cached) = self.versions_cache.lock().unwrap().get(name)
-            && !cached.is_empty()
-        {
-            return Ok(cached.clone());
+        let cached_versions = self
+            .versions_cache
+            .lock()
+            .unwrap()
+            .get(name)
+            .cloned();
+
+        if let Some(versions) = cached_versions {
+            return Ok(versions);
         }
 
         self.bridge
@@ -108,12 +132,12 @@ impl PubGrubAdapter {
 
         match self.bridge.response_rx.recv() {
             Ok(ProviderResponse::Versions(versions)) => {
-                if !versions.is_empty() {
-                    self.versions_cache
-                        .lock()
-                        .unwrap()
-                        .insert(name.clone(), versions.clone());
-                }
+                // Cached, since a real package's versions don't change during the solve.
+                self.versions_cache
+                    .lock()
+                    .unwrap()
+                    .insert(name.clone(), versions.clone());
+
                 Ok(versions)
             }
             Ok(ProviderResponse::VirtualVersions(versions)) => {
@@ -125,12 +149,9 @@ impl PubGrubAdapter {
                     .virtual_packages
                     .insert(name.clone());
 
-                if !versions.is_empty() {
-                    self.versions_cache
-                        .lock()
-                        .unwrap()
-                        .insert(name.clone(), versions.clone());
-                }
+                // Not cached, since the list grows as more packages are read, and the
+                // solver should get the latest one.
+
                 Ok(versions)
             }
             Ok(ProviderResponse::Err(e)) => {
@@ -181,6 +202,12 @@ impl pubgrub::DependencyProvider for PubGrubAdapter {
                 Reverse(PRIORITY_PLATFORM)
             }
             PubGrubPackage::Package(name) => {
+                // Ask about a new package right away, so a virtual one is ranked last before
+                // the solver reaches it. If that fails, choose_version asks again and reports the error.
+                if !self.is_known(name) {
+                    let _ = self.fetch_versions(name);
+                }
+
                 // Virtual packages have the lowest priority so all real packages
                 // (and their `provide` declarations) are processed before we try to satisfy them.
                 if self.observations
