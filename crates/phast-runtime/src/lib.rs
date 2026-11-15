@@ -14,5 +14,6 @@ pub mod event;
 pub mod executor;
 pub mod php;
 pub mod runner;
+pub mod scripts;
 
 mod hints;

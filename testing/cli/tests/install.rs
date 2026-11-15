@@ -43,6 +43,24 @@ const MANIFEST_WITH_HOOKS: &str = indoc! {r#"
     post-install-cmd = "echo POST_HOOK"
 "#};
 
+/// A project requiring one package, with Symfony Flex's `auto-scripts` map run from
+/// the install hook through a reference.
+const MANIFEST_WITH_SYMFONY_FLEX: &str = indoc! {r#"
+    [package]
+    name = "acme/my-project"
+    type = "project"
+
+    [require]
+    "vendor/alpha" = "^1.0"
+
+    [scripts]
+    post-install-cmd = ["@auto-scripts"]
+
+    [scripts.auto-scripts]
+    "cache:clear" = "symfony-cmd"
+    "assets:install %PUBLIC_DIR%" = "symfony-cmd"
+"#};
+
 /// A project requiring one package.
 fn project() -> Project {
     Project::new().manifest(MANIFEST)
@@ -150,6 +168,22 @@ async fn install_dry_run_from_a_fresh_lock_writes_nothing() {
         !project.root().join("vendor").exists(),
         "a dry run installed into vendor/",
     );
+}
+
+#[tokio::test]
+async fn install_on_a_symfony_project_warns_about_its_flex_scripts() {
+    let registry = registry().await;
+    let project = Project::new().manifest(MANIFEST_WITH_SYMFONY_FLEX);
+
+    project
+        .cmd()
+        .args(["install", "--registry-url", &registry.uri()])
+        .assert()
+        .success()
+        .stderr(contains("Skipping 'auto-scripts'"))
+        .stderr(contains("'cache:clear', 'assets:install %PUBLIC_DIR%'"));
+
+    assert!(project.root().join("vendor/vendor/alpha").exists());
 }
 
 #[tokio::test]

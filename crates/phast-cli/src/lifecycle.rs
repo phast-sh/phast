@@ -8,6 +8,7 @@
 //! `phast install --project-dir <project>`, `post-install-cmd` runs in the invocation directory,
 //! where `vendor/` is not.
 
+use crate::hints;
 use crate::output::Printer;
 
 use std::collections::BTreeMap;
@@ -27,6 +28,20 @@ pub fn register(
     printer: &Printer,
     events: &[LifecycleEvent],
 ) -> LifecycleEventManager {
+    // TODO:
+    //  Map scripts, like Symfony Flex's `auto-scripts`, are read but not run.
+    //  Remove this warning once maps either run, or are reported when the
+    //  manifest is read.
+    for (name, script) in &scripts {
+        if let Script::Map(commands) = script {
+            let commands: Vec<String> = commands
+                .keys()
+                .map(|command| format!("'{command}'"))
+                .collect();
+            printer.warning(hints::map_script_skipped(name, &commands.join(", ")));
+        }
+    }
+
     let mut lc = LifecycleEventManager::new();
     let runner = Arc::new(ScriptRunner::new(scripts, Executor::new()));
 

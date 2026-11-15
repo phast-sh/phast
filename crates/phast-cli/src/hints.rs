@@ -71,6 +71,14 @@ pub fn script_not_found(name: &str) -> String {
     format!("script '{}' not found in [scripts].", name)
 }
 
+/// Map scripts are not supported.
+pub fn map_script_skipped(name: &str, commands: &str) -> String {
+    format!(
+        "Skipping '{name}': Phast doesn't support map scripts. \
+         Run these yourself if you need them: {commands}"
+    )
+}
+
 /// composer.json was not found in the current directory.
 pub fn composer_json_not_found() -> &'static str {
     "'composer.json' not found in current directory"
