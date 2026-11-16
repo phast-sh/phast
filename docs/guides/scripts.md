@@ -23,11 +23,12 @@ A value is either a single command string or an array of commands run in sequenc
 sequence stops at the first command that exits non-zero, and the Phast command that
 triggered it fails with that exit status.
 
-## The three command forms
+## Command forms
 
 | Form            | Example                | How it runs                                                    |
 |-----------------|------------------------|----------------------------------------------------------------|
 | `@php ...`      | `@php artisan migrate` | The resolved PHP binary, with the rest as arguments            |
+| `@name`         | `@lint`                | The script called `lint`, in its place                         |
 | Static callback | `Vendor\Class::method` | A short PHP bootstrap loads `vendor/autoload.php` and calls it |
 | Shell command   | `cp .env.example .env` | Passed to `sh -c`, so shell syntax works                       |
 
@@ -36,10 +37,42 @@ triggered it fails with that exit status.
 callbacks receive a minimal `Composer\Script\Event` stub when the real class is not
 installed, so common Composer-era callbacks run unchanged.
 
+A script can run another one with `@name`, and that one can run others in turn:
+
+```toml
+[scripts]
+lint = "vendor/bin/phpstan analyse"
+test = ["@lint", "@php vendor/bin/phpunit"]
+```
+
+`phast run test` runs `lint` first, then PHPUnit.
+
 !!! note
-    Script references (a script whose value is `"@another-script"`) are not supported
-    yet; inline the commands instead. Scripts that invoke the `composer` binary only
-    work if Composer happens to be installed.
+    Scripts that invoke the `composer` binary only work if Composer happens to be
+    installed.
+
+## Scripts written as a map
+
+Symfony projects have a script written as a map rather than a command or a list: each
+command is mapped to how Symfony Flex, a Composer plugin, should run it.
+
+```toml
+[scripts]
+post-install-cmd = ["@auto-scripts"]
+
+[scripts.auto-scripts]
+"cache:clear" = "symfony-cmd"
+"assets:install %PUBLIC_DIR%" = "symfony-cmd"
+```
+
+Phast reads and keeps these, but doesn't run them. `phast install` and `phast update` say
+so, and list the commands so you can run them yourself:
+
+```console
+Skipping 'auto-scripts': Phast doesn't support map scripts. Run these yourself if you need them: 'cache:clear', 'assets:install %PUBLIC_DIR%'
+```
+
+For a Symfony project, those are console commands: `php bin/console cache:clear`.
 
 ## Lifecycle hooks
 

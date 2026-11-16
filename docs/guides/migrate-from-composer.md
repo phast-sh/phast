@@ -100,19 +100,20 @@ Be aware of these gaps before switching a production project:
 
 ## Script compatibility
 
-Scripts are copied verbatim, and most run unchanged: `@php ...` commands, plain shell
-commands, and PHP static callbacks (`Vendor\Class::method`) are all supported, and Phast
-fires the common lifecycle events (`pre-/post-install-cmd`, `pre-/post-update-cmd`,
-`pre-/post-autoload-dump`). Unknown event names are silently skipped, so leftover
-Composer-specific hooks do no harm.
+Scripts are copied as-is, and most run unchanged: `@php ...` commands, plain shell
+commands, PHP static callbacks (`Vendor\Class::method`) and `@name` calls to other
+scripts are all supported, and Phast fires the common lifecycle events
+(`pre-/post-install-cmd`, `pre-/post-update-cmd`, `pre-/post-autoload-dump`). Unknown
+event names are silently skipped, so leftover Composer-specific hooks do no harm.
 
 Two cases need attention:
 
 - **Scripts that call `composer` directly** (e.g. `composer dump-autoload`) will only
   work if Composer is still installed; Phast does not emulate the `composer` CLI.
   Replace them with the Phast equivalent or an `@php` command.
-- **Script references** (`"test": "@unit-tests"`-style aliases) are not supported yet;
-  inline the referenced commands.
+- **Scripts written as a map**, like Symfony's `auto-scripts`, are carried over as a
+  table but not run, since they rely on the Symfony Flex plugin. `phast install`
+  lists their commands so you can run them manually.
 
 See [Running scripts](scripts.md) for the details.
 
