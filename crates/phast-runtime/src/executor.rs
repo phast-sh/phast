@@ -55,6 +55,7 @@ impl Executor {
             ScriptEntry::Shell(cmd)       => self.execute_shell(cmd, output),
             ScriptEntry::PhpCommand(args) => self.execute_php_command(args, output),
             ScriptEntry::PhpCallback(cb)  => self.execute_php_callback(cb, output),
+            ScriptEntry::Reference(name)  => bail!(hints::reference_not_expanded(name)),
         }
     }
 

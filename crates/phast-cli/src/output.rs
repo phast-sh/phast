@@ -136,8 +136,7 @@ impl Printer {
 }
 
 impl ScriptOutput for Printer {
-    /// Print the script command before it runs,
-    /// so the user can see what is being executed.
+    /// Print the script command before it runs.
     fn info(&self, msg: &str) {
         self.info(msg);
     }

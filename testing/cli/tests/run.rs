@@ -3,8 +3,10 @@ mod common;
 use common::project::Project;
 
 use indoc::indoc;
-use predicates::str::contains;
+use predicates::prelude::PredicateBooleanExt;
+use predicates::str::{contains, is_match};
 
+/// A project with two scripts: a single command, and a list of two.
 const MANIFEST: &str = indoc! {r#"
     [package]
     name = "acme/my-project"
@@ -13,6 +15,21 @@ const MANIFEST: &str = indoc! {r#"
     [scripts]
     greet = "echo hello from phast"
     multi = ["echo step1", "echo step2"]
+"#};
+
+/// A project whose scripts call each other with `@`, including a cycle
+/// and a call to a script that doesn't exist.
+const MANIFEST_WITH_REFERENCES: &str = indoc! {r#"
+    [package]
+    name = "acme/my-project"
+    type = "project"
+
+    [scripts]
+    lint   = "echo lint"
+    test   = ["@lint", "echo test"]
+    ping   = "@pong"
+    pong   = "@ping"
+    broken = ["echo ran", "@missing"]
 "#};
 
 /// A project declaring two scripts.
@@ -74,4 +91,45 @@ async fn run_fails_without_manifest() {
     let project = Project::new();
 
     project.cmd().args(["run", "greet"]).assert().failure();
+}
+
+// ---------------------------------------------------------------------------
+// Scripts that call other scripts
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn run_executes_a_referenced_script() {
+    let project = Project::new().manifest(MANIFEST_WITH_REFERENCES);
+
+    project
+        .cmd()
+        .args(["run", "test"])
+        .assert()
+        .success()
+        .stdout(is_match("(?s)> echo lint.*> echo test").unwrap());
+}
+
+#[tokio::test]
+async fn run_fails_on_a_cyclic_reference() {
+    let project = Project::new().manifest(MANIFEST_WITH_REFERENCES);
+
+    project
+        .cmd()
+        .args(["run", "ping"])
+        .assert()
+        .failure()
+        .stderr(contains("ping → pong → ping"));
+}
+
+#[tokio::test]
+async fn run_fails_on_a_missing_reference_before_running_anything() {
+    let project = Project::new().manifest(MANIFEST_WITH_REFERENCES);
+
+    project
+        .cmd()
+        .args(["run", "broken"])
+        .assert()
+        .failure()
+        .stderr(contains("missing"))
+        .stdout(contains("> echo ran").not());
 }

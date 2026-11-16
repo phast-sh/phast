@@ -1,11 +1,12 @@
+use std::time::Duration;
+
 use phast_core::manifest::Manifest;
 use phast_core::manifest::PlatformCheck;
 use phast_core::manifest::Repository;
+use phast_core::manifest::Script;
 use phast_core::package::PackageName;
 use phast_version::parser::{parse_constraint, parse_version};
 use phast_version::{Constraint, RequireSpec, Stability, VersionSpec};
-
-use std::time::Duration;
 
 use indoc::indoc;
 use tempfile::TempDir;
@@ -229,6 +230,30 @@ fn composer_json_skips_unknown_repository_type() {
     assert!(manifest.repositories.is_empty());
 }
 
+#[test]
+fn composer_json_scripts_take_an_object_in_order() {
+    let json = indoc! {r#"
+        {
+            "scripts": {
+                "auto-scripts": {
+                    "cache:clear": "symfony-cmd",
+                    "assets:install %PUBLIC_DIR%": "symfony-cmd"
+                },
+                "post-install-cmd": ["@auto-scripts"]
+            }
+        }
+    "#};
+    let manifest = Manifest::from_composer_json(json).unwrap();
+
+    let Script::Map(commands) = &manifest.scripts["auto-scripts"] else {
+        panic!("auto-scripts should be read as a map");
+    };
+    assert_eq!(
+        commands.keys().collect::<Vec<_>>(),
+        ["cache:clear", "assets:install %PUBLIC_DIR%"],
+    );
+}
+
 // ---------------------------------------------------------------------------
 // phast.toml parsing
 // ---------------------------------------------------------------------------
@@ -330,6 +355,24 @@ fn phast_toml_scripts_take_a_string_or_a_list() {
     assert_eq!(
         manifest.scripts["test"].as_str(),
         vec!["phpunit", "phpstan analyse"],
+    );
+}
+
+#[test]
+fn phast_toml_scripts_take_a_table_in_order() {
+    let toml = indoc! {r#"
+        [scripts.auto-scripts]
+        "cache:clear" = "symfony-cmd"
+        "assets:install %PUBLIC_DIR%" = "symfony-cmd"
+    "#};
+    let manifest = Manifest::from_phast_toml(toml).unwrap();
+
+    let Script::Map(commands) = &manifest.scripts["auto-scripts"] else {
+        panic!("auto-scripts should be read as a map");
+    };
+    assert_eq!(
+        commands.keys().collect::<Vec<_>>(),
+        ["cache:clear", "assets:install %PUBLIC_DIR%"],
     );
 }
 
