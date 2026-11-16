@@ -8,8 +8,7 @@ use std::collections::HashMap;
 
 use phast_core::lock::phast::{AutoloadSection, ExtraSection};
 use phast_core::package::PackageName;
-use phast_version::parser::parse_constraint;
-use phast_version::{Constraint, Stability, Version};
+use phast_version::{Constraint, RequireSpec, Stability, Version};
 
 use anyhow::Context;
 use serde_json::Value as JsonValue;
@@ -35,20 +34,33 @@ pub(crate) fn split_package_name(name: &PackageName) -> (&str, &str) {
         .unwrap_or(("_", name.as_str()))
 }
 
-/// Convert a raw dependency map (package name -> constraint string) into typed pairs.
+/// Convert a raw dependency map (package name -> constraint string) into typed pairs,
+/// for the package published at `version`.
 ///
 /// Returns an error if any constraint string does not parse, naming the constraint
 /// and the package that declared it.
 pub(crate) fn convert_dependency_map(
     raw: &HashMap<String, String>,
+    version: &Version,
 ) -> anyhow::Result<Vec<(PackageName, Constraint)>> {
     raw.iter()
-        .map(|(name, constraint)| {
-            let constraint = parse_constraint(constraint)
-                .with_context(|| format!("invalid constraint '{constraint}' for '{name}'"))?;
-            Ok((PackageName::new(name), constraint))
-        })
+        .map(|(name, constraint)| convert_dependency(name, constraint, version))
         .collect()
+}
+
+/// Convert one requirement of the package published at `version` into a typed pair.
+///
+/// `self.version` means `version` itself, so it becomes an exact constraint on it.
+/// Returns an error if the constraint does not parse, naming it and the package.
+pub(crate) fn convert_dependency(
+    name: &str,
+    constraint: &str,
+    version: &Version,
+) -> anyhow::Result<(PackageName, Constraint)> {
+    let spec: RequireSpec = constraint
+        .parse()
+        .with_context(|| format!("invalid constraint '{constraint}' for '{name}'"))?;
+    Ok((PackageName::new(name), spec.resolve(version)))
 }
 
 /// Convert a p2 autoload map into an [`AutoloadSection`].

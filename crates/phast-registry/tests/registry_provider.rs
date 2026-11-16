@@ -9,8 +9,8 @@ use phast_registry::http::client::HttpClient;
 use phast_registry::provider::{Lockable, RegistryProvider};
 use phast_registry::router::RegistryOptions;
 use phast_resolver::provider::Provider;
-use phast_version::Stability;
 use phast_version::parser;
+use phast_version::{Constraint, Stability};
 
 use serde_json::{Value as JsonValue, json};
 use tempfile::TempDir;
@@ -601,11 +601,15 @@ async fn replace_and_provide_specs_resolve_to_the_package_version() {
     serve(
         &server,
         "/p2/laravel/framework.json",
-        json!({ "packages": { "laravel/framework": [{
-            "version": "11.0.0",
-            "replace": { "illuminate/auth": "self.version", "spatie/once": "*" },
-            "provide": { "psr/container-implementation": "self.version" },
-        }]}}),
+        json!({
+            "packages": {
+                "laravel/framework": [{
+                    "version": "11.0.0",
+                    "replace": { "illuminate/auth": "self.version", "spatie/once": "*" },
+                    "provide": { "psr/container-implementation": "self.version" },
+                }]
+            }
+        }),
     )
     .await;
     absent(&server, "/p2/laravel/framework~dev.json").await;
@@ -627,6 +631,42 @@ async fn replace_and_provide_specs_resolve_to_the_package_version() {
     assert_eq!(
         meta.provide,
         vec![(PackageName::new("psr/container-implementation"), version)],
+    );
+}
+
+#[tokio::test]
+async fn a_self_version_requirement_resolves_to_the_package_version() {
+    let server = MockServer::start().await;
+    discovery(&server, METADATA_URL).await;
+
+    // illuminate/database requires a sibling package at its own version.
+    serve(
+        &server,
+        "/p2/illuminate/database.json",
+        json!({
+            "packages": {
+                "illuminate/database": [{
+                    "version": "11.0.0",
+                    "require": { "illuminate/collections": "self.version" },
+                }]
+            }
+        }),
+    )
+    .await;
+    absent(&server, "/p2/illuminate/database~dev.json").await;
+
+    let tmp = TempDir::new().unwrap();
+    let provider = provider(&server, tmp.path(), options());
+    let name = PackageName::new("illuminate/database");
+    let version = parser::parse_version("11.0.0").unwrap();
+    let meta = provider.metadata(&name, &version).await.unwrap();
+
+    assert_eq!(
+        meta.require,
+        vec![(
+            PackageName::new("illuminate/collections"),
+            Constraint::Exact(version),
+        )],
     );
 }
 
