@@ -1,7 +1,7 @@
 //! [`InlineProvider`]: a package declared inline in `[sources]`.
 
 use crate::hints;
-use crate::p2::convert::convert_extra;
+use crate::p2::convert::{convert_dependency, convert_extra};
 use crate::provider::Lockable;
 use crate::vcs::{Host, VcsHost};
 
@@ -9,7 +9,7 @@ use phast_core::lock::phast::{DistSection, ExtraSection, PackageDef, SourceRef};
 use phast_core::manifest::VcsType;
 use phast_core::package::PackageName;
 use phast_resolver::provider::{PackageMetadata, Provider};
-use phast_version::parser::{parse_constraint, parse_declared_version};
+use phast_version::parser::parse_declared_version;
 use phast_version::{Constraint, Version};
 
 use anyhow::Context;
@@ -69,7 +69,7 @@ impl InlineProvider {
             .with_context(|| format!("inline package '{}' declares no version", package_name.as_str()))?;
         let version = parse_declared_version(version)
             .with_context(|| format!("invalid version for inline package '{}'", package_name.as_str()))?;
-        let require = inline_require(package.get("require"))?;
+        let require = inline_require(package.get("require"), &version)?;
 
         let src = package
             .get("source");
@@ -168,18 +168,22 @@ impl Lockable for InlineProvider {
     }
 }
 
-/// Parse an inline package's `require` map into resolved constraints.
-fn inline_require(value: Option<&JsonValue>) -> anyhow::Result<Vec<(PackageName, Constraint)>> {
+/// Parse an inline package's `require` map. `version` is the package's own version,
+/// which `self.version` is replaced with.
+fn inline_require(
+    value: Option<&JsonValue>,
+    version: &Version,
+) -> anyhow::Result<Vec<(PackageName, Constraint)>> {
     let Some(map) = value.and_then(JsonValue::as_object) else {
         return Ok(vec![]);
     };
 
     map.iter()
         .map(|(name, constraint)| {
-            let _c = constraint
+            let constraint = constraint
                 .as_str()
                 .with_context(|| format!("require constraint for '{name}' must be a string"))?;
-            Ok((PackageName::new(name), parse_constraint(_c)?))
+            convert_dependency(name, constraint, version)
         })
         .collect()
 }
