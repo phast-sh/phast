@@ -150,14 +150,14 @@ async fn a_self_version_requirement_resolves_to_the_declared_version() {
     let mut spec = spec();
     spec["require"] = json!({ "acme/widget": "self.version" });
     let provider = provider(&spec);
-    let versions = provider.versions(&name()).await.unwrap();
+    let version = phast_version::parser::parse_version(VERSION).unwrap();
 
-    let metadata = provider.metadata(&name(), &versions[0]).await.unwrap();
+    let metadata = provider.metadata(&name(), &version).await.unwrap();
     assert_eq!(
         metadata.require,
         vec![(
             PackageName::new("acme/widget"),
-            phast_version::Constraint::Exact(versions[0].clone()),
+            phast_version::Constraint::Exact(version),
         )],
     );
 }
