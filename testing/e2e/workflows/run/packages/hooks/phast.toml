@@ -1,0 +1,12 @@
+[package]
+name    = "acme/hooks"
+version = "1.0.0"
+type    = "library"
+
+# The callback loads through psr-4, like in most packages.
+[autoload.psr-4]
+"Acme\\Hooks\\" = ["src/"]
+
+# The callback deletes legacy/Unused.php. The final classmap must not list it.
+[autoload]
+classmap = ["legacy/"]
