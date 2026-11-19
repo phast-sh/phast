@@ -74,11 +74,20 @@ impl VcsProvider {
             .map(PackageName::new)
             .context("repository manifest declares no package name")?;
 
-        let candidates = Candidate::all(
+        // A root `dev-develop as 5.0.9999` on this package adds a candidate at the
+        // phantom version, backed by the real ref. Borrowed before `all` consumes
+        // `references`; absent or non-matching, nothing is added.
+        let inline_alias = options
+            .inline_aliases
+            .get(&name)
+            .and_then(|alias| Candidate::inline_alias(&references, alias));
+
+        let mut candidates = Candidate::all(
             &manifest,
             references,
             options.minimum_stability,
         );
+        candidates.extend(inline_alias);
 
         Ok(Self {
             name,

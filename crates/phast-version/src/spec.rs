@@ -100,6 +100,34 @@ pub enum RequireSpec {
         /// stable versions. Honored only for root requirements.
         stability: Option<StabilityFlag>,
     },
+    /// An inline alias (`dev-develop as 5.0.9999`): install the `constraint`'s ref
+    /// (a branch or exact version), but present it to other packages under the
+    /// phantom `alias` so their numeric constraints can match it.
+    ///
+    /// Honored only for root requirements; in a dependency the `as` clause is
+    /// ignored and the entry behaves as the base `constraint` alone (see
+    /// [`resolve`](RequireSpec::resolve)). The phantom version is pinned at the
+    /// root via [`root_constraint`](RequireSpec::root_constraint), and a synthetic
+    /// candidate for it is produced from [`inline_alias`](RequireSpec::inline_alias).
+    Aliased {
+        /// The ref actually installed, e.g. `Branch("develop")` or an exact version.
+        constraint: Constraint,
+        /// The phantom version exposed to dependents, e.g. `Numeric(5.0.9999)`.
+        alias: Version,
+        /// The stability the base ref implies (`dev-develop` → `Dev`), if any.
+        stability: Option<StabilityFlag>,
+    },
+}
+
+/// A parsed inline alias (`dev-develop as 5.0.9999`): the ref to install and the
+/// phantom version to expose for it. Carried from a root `require` to the provider
+/// so a synthetic candidate at `alias` can be offered for the `reference` branch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InlineAlias {
+    /// The base ref the alias points at, e.g. `Branch("develop")`.
+    pub reference: Constraint,
+    /// The phantom version the ref is offered under, e.g. `Numeric(5.0.9999)`.
+    pub alias: Version,
 }
 
 /// The stability a root requirement asks for, and how it asked.
@@ -133,10 +161,42 @@ impl StabilityFlag {
 impl RequireSpec {
     /// The concrete constraint this spec denotes for a package resolved at
     /// `declaring`: `self.version` becomes `== declaring`; a constraint is itself.
+    ///
+    /// An inline alias resolves to its *base* constraint, not its phantom version:
+    /// this is the transitive-safe reading (a dependency's `dev-x as 1.0` means
+    /// `dev-x`), while the root pins the phantom version through
+    /// [`root_constraint`](Self::root_constraint).
     pub fn resolve(&self, declaring: &Version) -> Constraint {
         match self {
             RequireSpec::SelfVersion => Constraint::Exact(declaring.clone()),
             RequireSpec::Constraint { constraint, .. } => constraint.clone(),
+            RequireSpec::Aliased { constraint, .. } => constraint.clone(),
+        }
+    }
+
+    /// The constraint a **root** requirement contributes to resolution. Identical to
+    /// [`resolve`](Self::resolve) except an inline alias pins its phantom version
+    /// (`dev-develop as 5.0.9999` → `== 5.0.9999`), so the root and any dependents
+    /// unify on the one synthetic candidate that the phantom version offers.
+    pub fn root_constraint(&self, declaring: &Version) -> Constraint {
+        match self {
+            RequireSpec::Aliased { alias, .. } => Constraint::Exact(alias.clone()),
+            _ => self.resolve(declaring),
+        }
+    }
+
+    /// The inline alias this spec declares, if any — the ref to install paired with
+    /// the phantom version to offer for it. Collected from root requirements so the
+    /// provider can synthesize the matching candidate.
+    pub fn inline_alias(&self) -> Option<InlineAlias> {
+        match self {
+            RequireSpec::Aliased {
+                constraint, alias, ..
+            } => Some(InlineAlias {
+                reference: constraint.clone(),
+                alias: alias.clone(),
+            }),
+            _ => None,
         }
     }
 
@@ -145,6 +205,7 @@ impl RequireSpec {
     pub fn stability(&self) -> Option<StabilityFlag> {
         match self {
             RequireSpec::Constraint { stability, .. } => *stability,
+            RequireSpec::Aliased { stability, .. } => *stability,
             RequireSpec::SelfVersion => None,
         }
     }
@@ -153,23 +214,43 @@ impl RequireSpec {
 impl FromStr for RequireSpec {
     type Err = ConstraintError;
 
-    /// `self.version` maps to its variant; anything else parses as a constraint,
+    /// `self.version` maps to its variant; a `<ref> as <version>` inline alias maps
+    /// to [`Aliased`](RequireSpec::Aliased); anything else parses as a constraint,
     /// capturing any trailing `@stability` flag (`*` maps to `Constraint::Any`).
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        match string.trim() {
-            SELF_VERSION => Ok(RequireSpec::SelfVersion),
-            other => {
-                let (constraint, flag) = parse_requirement(other)?;
-                let stability = match flag {
-                    Some(s) => Some(StabilityFlag::Explicit(s)),
-                    None => implied_stability(other).map(StabilityFlag::Implied),
-                };
-                Ok(RequireSpec::Constraint {
-                    constraint,
-                    stability,
-                })
-            }
+        let trimmed = string.trim();
+
+        if trimmed == SELF_VERSION {
+            return Ok(RequireSpec::SelfVersion);
         }
+
+        // Composer inline alias: `<ref> as <version>`. The left is the ref actually
+        // installed; the right is the phantom version it is offered under. Only a
+        // branch or exact version may be aliased (matching Composer) — a range on
+        // the left makes no sense as a single installable ref and is rejected.
+        if let Some((left, right)) = trimmed.split_once(" as ") {
+            let (constraint, flag) = parse_requirement(left)?;
+            if !matches!(constraint, Constraint::Branch(_) | Constraint::Exact(_)) {
+                return Err(ConstraintError::Invalid(
+                    trimmed.to_owned(),
+                    "inline alias may only alias a branch or an exact version".to_owned(),
+                ));
+            }
+            let alias = parse_version(right.trim())
+                .map_err(|error| ConstraintError::Invalid(trimmed.to_owned(), error.to_string()))?;
+            let stability = stability_flag(left, flag);
+            return Ok(RequireSpec::Aliased {
+                constraint,
+                alias,
+                stability,
+            });
+        }
+
+        let (constraint, flag) = parse_requirement(trimmed)?;
+        Ok(RequireSpec::Constraint {
+            constraint,
+            stability: stability_flag(trimmed, flag),
+        })
     }
 }
 
@@ -183,6 +264,20 @@ impl Display for RequireSpec {
                 => write!(f, "{constraint}@{}", s.as_str()),
             RequireSpec::Constraint { constraint, .. }
                 => write!(f, "{constraint}"),
+            RequireSpec::Aliased { constraint, alias, stability: Some(StabilityFlag::Explicit(s)) }
+                => write!(f, "{constraint}@{} as {alias}", s.as_str()),
+            RequireSpec::Aliased { constraint, alias, .. }
+                => write!(f, "{constraint} as {alias}"),
         }
+    }
+}
+
+/// The stability flag a requirement string carries: an explicit `@flag` if present,
+/// otherwise the one its text implies by naming an unstable version. Shared by the
+/// plain and inline-alias parse paths.
+fn stability_flag(text: &str, explicit: Option<Stability>) -> Option<StabilityFlag> {
+    match explicit {
+        Some(s) => Some(StabilityFlag::Explicit(s)),
+        None => implied_stability(text).map(StabilityFlag::Implied),
     }
 }

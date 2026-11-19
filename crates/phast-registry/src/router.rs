@@ -39,7 +39,7 @@ use phast_core::lock::phast::PackageDef;
 use phast_core::manifest::{GitRef, Manifest, Source};
 use phast_core::package::PackageName;
 use phast_resolver::provider::{PackageMetadata, Provider};
-use phast_version::{Stability, Version};
+use phast_version::{InlineAlias, Stability, Version};
 
 use dashmap::DashMap;
 
@@ -139,6 +139,9 @@ pub struct RegistryOptions {
     /// Per-package stability floors from root `@stability` flags (`^2.0@dev`),
     /// overriding `minimum_stability` for the named package only.
     pub stability_overrides: HashMap<PackageName, Stability>,
+    /// Per-package inline aliases from root requirements (`dev-develop as 5.0.9999`),
+    /// used to synthesize a candidate at the phantom version for the aliased ref.
+    pub inline_aliases: HashMap<PackageName, InlineAlias>,
 }
 
 #[rustfmt::skip]
@@ -159,10 +162,18 @@ impl RegistryOptions {
             })
             .collect();
 
+        let inline_aliases = manifest
+            .require
+            .iter()
+            .chain(manifest.require_dev.iter())
+            .filter_map(|(name, spec)| Some((name.clone(), spec.inline_alias()?)))
+            .collect();
+
         Self {
             minimum_stability:   manifest.config.minimum_stability,
             minimum_package_age: manifest.config.minimum_package_age,
             stability_overrides,
+            inline_aliases,
         }
     }
 }

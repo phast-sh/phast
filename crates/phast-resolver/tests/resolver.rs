@@ -45,6 +45,20 @@ fn dev_requirement(name: &str, constraint: &str) -> Requirement {
     }
 }
 
+/// A root inline-alias `[require]` entry (`<ref_constraint> as <alias>`): install
+/// `ref_constraint`, but present the package to the solve under the phantom `alias`.
+fn aliased_requirement(name: &str, ref_constraint: &str, alias: Version) -> Requirement {
+    Requirement {
+        name: package(name),
+        spec: RequireSpec::Aliased {
+            constraint: parse_constraint(ref_constraint).unwrap(),
+            alias,
+            stability: None,
+        },
+        is_dev: false,
+    }
+}
+
 /// One entry in a package's own dependency list.
 fn dependency(name: &str, constraint: &str) -> (String, phast_version::Constraint) {
     (name.to_owned(), parse_constraint(constraint).unwrap())
@@ -794,4 +808,55 @@ async fn a_pin_for_a_known_dev_package_is_dropped_from_a_production_solve() {
         names(unfiltered.packages.keys()),
         ["vendor/a", "vendor/tool"],
     );
+}
+
+// ---------------------------------------------------------------------------
+// Inline aliases (`dev-develop as 5.0.9999`)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn an_inline_alias_selects_the_phantom_version() {
+    // vendor/a is served only from a dev branch, alongside the phantom version an
+    // inline alias synthesizes for it. The root alias pins that phantom version.
+    let mut provider = MemoryProvider::new();
+    provider.add_package("vendor/a", Version::Branch("develop".to_owned()), vec![]);
+    provider.add_package("vendor/a", stable(5, 0, 9999), vec![]);
+
+    let solution = run(
+        provider,
+        vec![aliased_requirement(
+            "vendor/a",
+            "dev-develop",
+            stable(5, 0, 9999),
+        )],
+    )
+    .await
+    .unwrap();
+    assert_eq!(solution[&package("vendor/a")], stable(5, 0, 9999));
+}
+
+#[tokio::test]
+async fn an_inline_alias_lets_a_branch_satisfy_a_numeric_dependent() {
+    // The point of the alias: a dependent requiring vendor/a numerically — which the
+    // bare branch could never satisfy — unifies with the root on the phantom version.
+    let mut provider = MemoryProvider::new();
+    provider.add_package("vendor/a", Version::Branch("develop".to_owned()), vec![]);
+    provider.add_package("vendor/a", stable(5, 0, 9999), vec![]);
+    provider.add_package(
+        "vendor/b",
+        stable(1, 0, 0),
+        vec![dependency("vendor/a", "^5.0")],
+    );
+
+    let solution = run(
+        provider,
+        vec![
+            aliased_requirement("vendor/a", "dev-develop", stable(5, 0, 9999)),
+            requirement("vendor/b", "^1.0"),
+        ],
+    )
+    .await
+    .unwrap();
+    assert_eq!(solution[&package("vendor/a")], stable(5, 0, 9999));
+    assert_eq!(solution[&package("vendor/b")], stable(1, 0, 0));
 }

@@ -1,5 +1,7 @@
 use phast_version::parser::parse_version;
-use phast_version::{Constraint, RequireSpec, Stability, StabilityFlag, Version, VersionSpec};
+use phast_version::{
+    Constraint, InlineAlias, RequireSpec, Stability, StabilityFlag, Version, VersionSpec,
+};
 
 /// The version `raw` names, which every spec here is resolved against or holds.
 fn version(raw: &str) -> Version {
@@ -276,6 +278,120 @@ fn an_explicit_flag_leaves_nothing_implied() {
 fn an_implied_stability_is_never_rendered() {
     let spec = "dev-master".parse::<RequireSpec>().unwrap();
     assert_eq!(spec.to_string(), "dev-master");
+}
+
+// ---------------------------------------------------------------------------
+// RequireSpec: inline aliases (`<ref> as <version>`)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parses_an_inline_alias() {
+    // `dev-develop as 5.0.9999` installs the branch but presents the phantom version.
+    assert_eq!(
+        "dev-develop as 5.0.9999".parse::<RequireSpec>().unwrap(),
+        RequireSpec::Aliased {
+            constraint: Constraint::Branch("develop".to_owned()),
+            alias: version("5.0.9999"),
+            stability: Some(StabilityFlag::Implied(Stability::Dev)),
+        },
+    );
+}
+
+#[test]
+fn an_inline_alias_resolves_to_its_base_ref() {
+    // The default (transitive) reading is the ref itself; the `as` clause is ignored
+    // off the root, so a dependency's alias behaves as a plain branch require.
+    let spec = "dev-develop as 5.0.9999".parse::<RequireSpec>().unwrap();
+    assert_eq!(
+        spec.resolve(&version("12.62")),
+        Constraint::Branch("develop".to_owned()),
+    );
+}
+
+#[test]
+fn an_inline_alias_pins_its_phantom_version_at_the_root() {
+    // The root reading pins the phantom version so dependents' numeric requires unify.
+    let spec = "dev-develop as 5.0.9999".parse::<RequireSpec>().unwrap();
+    assert_eq!(
+        spec.root_constraint(&version("12.62")),
+        Constraint::Exact(version("5.0.9999")),
+    );
+}
+
+#[test]
+fn an_inline_alias_exposes_its_mapping() {
+    let spec = "dev-develop as 5.0.9999".parse::<RequireSpec>().unwrap();
+    assert_eq!(
+        spec.inline_alias(),
+        Some(InlineAlias {
+            reference: Constraint::Branch("develop".to_owned()),
+            alias: version("5.0.9999"),
+        }),
+    );
+}
+
+#[test]
+fn a_plain_require_has_no_inline_alias() {
+    assert_eq!("^5.0".parse::<RequireSpec>().unwrap().inline_alias(), None);
+    assert_eq!(
+        "self.version"
+            .parse::<RequireSpec>()
+            .unwrap()
+            .inline_alias(),
+        None,
+    );
+}
+
+#[test]
+fn an_inline_alias_implies_dev_from_its_branch() {
+    let spec = "dev-develop as 5.0.9999".parse::<RequireSpec>().unwrap();
+    assert_eq!(
+        spec.stability(),
+        Some(StabilityFlag::Implied(Stability::Dev)),
+    );
+}
+
+#[test]
+fn an_exact_version_may_be_aliased() {
+    // Composer allows aliasing a tag too, not just a branch.
+    let spec = "1.0.0 as 1.0.9999".parse::<RequireSpec>().unwrap();
+    assert_eq!(
+        spec.inline_alias(),
+        Some(InlineAlias {
+            reference: Constraint::Exact(version("1.0.0")),
+            alias: version("1.0.9999"),
+        }),
+    );
+}
+
+#[test]
+fn rejects_aliasing_a_range() {
+    // Only a single installable ref may be aliased; a range on the left is an error.
+    for raw in ["^5.0 as 5.0.9999", ">=1.0 <2.0 as 1.9999.0"] {
+        assert!(raw.parse::<RequireSpec>().is_err(), "for {raw:?}");
+    }
+}
+
+#[test]
+fn rejects_an_inline_alias_with_no_phantom_version() {
+    assert!("dev-develop as ".parse::<RequireSpec>().is_err());
+    assert!(
+        "dev-develop as not-a-version"
+            .parse::<RequireSpec>()
+            .is_err()
+    );
+}
+
+#[test]
+fn an_inline_alias_renders_back() {
+    // Phantom versions ending in a non-zero segment, since rendering drops trailing
+    // zeros (`2.9999.0` would render `2.9999`) and these assert the exact string.
+    for raw in ["dev-develop as 5.0.9999", "dev-main as 2.9999.1"] {
+        let spec = raw.parse::<RequireSpec>().unwrap();
+        assert_eq!(spec.to_string(), raw, "for {raw:?}");
+        // And survives a round trip through its rendering, the way a lock stores it.
+        assert_eq!(spec.to_string().parse::<RequireSpec>().unwrap(), spec);
+    }
 }
 
 // ---------------------------------------------------------------------------

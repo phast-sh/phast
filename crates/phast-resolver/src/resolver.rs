@@ -150,13 +150,16 @@ pub async fn resolve(
 
     // require/require-dev/conflict resolve their specs against the same root
     // version as replace/provide above, so `self.version` in the root binds to it.
+    // Root requirements use `root_constraint`, so an inline alias pins its phantom
+    // version (`dev-develop as 5.0.9999` → `== 5.0.9999`) and unifies with any
+    // dependent that requires the aliased package numerically.
     let prod_pairs: Vec<(PackageName, Constraint)> = prod_reqs
         .into_iter()
-        .map(|r| (r.name, r.spec.resolve(&version)))
+        .map(|r| (r.name, r.spec.root_constraint(&version)))
         .collect();
     let dev_pairs: Vec<(PackageName, Constraint)> = dev_reqs
         .into_iter()
-        .map(|r| (r.name, r.spec.resolve(&version)))
+        .map(|r| (r.name, r.spec.root_constraint(&version)))
         .collect();
 
     let conflicts: HashMap<PackageName, Ranges<Version>> = conflict

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use phast_core::manifest::GitRef;
@@ -9,7 +10,7 @@ use phast_registry::vcs::Host;
 use phast_registry::vcs::github::GitHubHost;
 use phast_resolver::provider::Provider;
 use phast_version::parser::parse_version;
-use phast_version::{Constraint, Stability, Version};
+use phast_version::{Constraint, InlineAlias, Stability, Version};
 
 use indoc::indoc;
 use serde_json::json;
@@ -277,6 +278,92 @@ async fn a_branch_alias_locks_as_the_branch_at_its_commit() {
     assert_eq!(locked.version, "dev-main");
     // ...pinned at the branch commit.
     assert_eq!(locked.source.unwrap().reference, "c2");
+}
+
+// ---------------------------------------------------------------------------
+// Offering a branch under a root inline alias
+// ---------------------------------------------------------------------------
+
+/// A provider discovered with a root inline alias registered for `acme/widget`,
+/// as the router would hand down from a `<ref> as <version>` require.
+async fn discovered_with_inline_alias(
+    server: &MockServer,
+    manifest: &str,
+    minimum_stability: Stability,
+    alias: InlineAlias,
+) -> VcsProvider {
+    repository(server, manifest).await;
+    VcsProvider::discover(
+        "https://github.com/acme/widget",
+        host(server),
+        RegistryOptions {
+            minimum_stability,
+            inline_aliases: HashMap::from([(PackageName::new("acme/widget"), alias)]),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn an_inline_alias_offers_the_branch_under_its_phantom_version() {
+    let server = MockServer::start().await;
+    let alias = InlineAlias {
+        reference: Constraint::Branch("main".to_owned()),
+        alias: parse_version("5.0.9999").unwrap(),
+    };
+    // Offered even under a stable floor — the stable phantom version is the whole
+    // point of aliasing a dev branch, unlike an `extra.branch-alias` dev version.
+    let provider = discovered_with_inline_alias(&server, MANIFEST, Stability::Stable, alias).await;
+    let name = provider.name().clone();
+
+    // Tag 1.0.0, branch main, and the phantom 5.0.9999 the alias adds.
+    let versions = provider.versions(&name).await.unwrap();
+    assert_eq!(versions.len(), 3);
+    assert!(versions.contains(&parse_version("5.0.9999").unwrap()));
+
+    // Which is what lets a numeric ^5.0 require select the branch.
+    let caret = Constraint::from_str("^5.0").unwrap();
+    assert!(
+        versions.iter().any(|version| caret.matches(version)),
+        "the phantom version should satisfy ^5.0: {versions:?}",
+    );
+}
+
+#[tokio::test]
+async fn an_inline_alias_locks_as_the_branch_at_its_commit() {
+    let server = MockServer::start().await;
+    let alias = InlineAlias {
+        reference: Constraint::Branch("main".to_owned()),
+        alias: parse_version("5.0.9999").unwrap(),
+    };
+    let provider = discovered_with_inline_alias(&server, MANIFEST, Stability::Stable, alias).await;
+
+    // Resolving the phantom version and locking it installs the real branch: the
+    // lock records `dev-main` at its commit, not a tag named for the phantom.
+    let locked = provider
+        .lock(provider.name(), &parse_version("5.0.9999").unwrap())
+        .await
+        .unwrap();
+    assert_eq!(locked.version, "dev-main");
+    assert_eq!(locked.source.unwrap().reference, "c2");
+}
+
+#[tokio::test]
+async fn an_inline_alias_for_a_ref_the_repository_lacks_is_dropped() {
+    let server = MockServer::start().await;
+    let alias = InlineAlias {
+        reference: Constraint::Branch("develop".to_owned()),
+        alias: parse_version("5.0.9999").unwrap(),
+    };
+    // The repository only has `main`, so there is no `develop` ref to back the
+    // phantom version and no candidate is synthesized.
+    let provider = discovered_with_inline_alias(&server, MANIFEST, Stability::Stable, alias).await;
+
+    let versions = provider.versions(provider.name()).await.unwrap();
+    assert_eq!(versions.len(), 2);
+    assert!(!versions.contains(&parse_version("5.0.9999").unwrap()));
 }
 
 // ---------------------------------------------------------------------------

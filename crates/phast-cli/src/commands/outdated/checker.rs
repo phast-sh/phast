@@ -114,6 +114,8 @@ impl OutdatedChecker {
             .chain(manifest.require_dev.iter())
             .filter_map(|(name, spec)| match spec {
                 RequireSpec::Constraint { constraint, .. } => Some((name.clone(), constraint.clone())),
+                // An inline alias installs a branch; compare its base ref, not the phantom.
+                RequireSpec::Aliased { constraint, .. } => Some((name.clone(), constraint.clone())),
                 RequireSpec::SelfVersion => None,
             })
             .collect();

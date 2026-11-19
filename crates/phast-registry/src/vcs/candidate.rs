@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use phast_core::manifest::Manifest;
 use phast_version::parser::parse_branch_alias;
-use phast_version::{Stability, Version};
+use phast_version::{Constraint, InlineAlias, Stability, Version};
 
 use anyhow::Result;
 use tokio::sync::OnceCell;
@@ -139,5 +139,27 @@ impl Candidate {
             ));
         }
         aliases
+    }
+
+    /// The candidate a root inline alias (`dev-develop as 5.0.9999`) adds: the aliased
+    /// ref offered under its phantom version, so a dependent's numeric require can
+    /// select it while the install and lock still follow the real ref.
+    ///
+    /// Unlike [`branch_aliases`](Self::branch_aliases) this is offered whatever the
+    /// stability floor: the phantom version is the stable face the alias gives a dev
+    /// branch, which is the whole reason to write one. `None` when the aliased ref —
+    /// a branch, or an exact version naming a tag — is not among the repository's refs.
+    pub fn inline_alias(references: &[VcsRef], alias: &InlineAlias) -> Option<Candidate> {
+        let reference = match &alias.reference {
+            Constraint::Branch(branch) => references.iter().find(|reference| {
+                reference.kind == RefKind::Branch && reference.name == *branch
+            }),
+            Constraint::Exact(version) => references.iter().find(|reference| {
+                reference.version().as_ref() == Some(version)
+            }),
+            _ => None,
+        }?;
+
+        Some(Candidate::new(alias.alias.clone(), reference.clone()))
     }
 }

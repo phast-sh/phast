@@ -22,6 +22,6 @@ pub mod stability;
 pub mod version;
 
 pub use constraint::Constraint;
-pub use spec::{RequireSpec, StabilityFlag, VersionSpec};
+pub use spec::{InlineAlias, RequireSpec, StabilityFlag, VersionSpec};
 pub use stability::Stability;
 pub use version::{NumericVersion, Version};
