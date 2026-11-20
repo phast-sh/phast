@@ -1,7 +1,7 @@
 //! Script entry classification, expansion, and orchestration.
 //!
 //! `ScriptEntry` classifies a raw manifest string into an execution variant.
-//! `ScriptRunner` owns the scripts map and an `Executor`, and is the public
+//! `ScriptRunner` owns the scripts map and an `Environment`, and is the public
 //! entry point for running lifecycle hooks.
 //!
 //! ## Classification order
@@ -15,7 +15,7 @@
 //! instead of calling `Foo::bar`.
 
 use crate::context::Invocation;
-use crate::executor::{Executor, ScriptOutput};
+use crate::executor::{Environment, Executor, ScriptOutput};
 use crate::scripts::Scripts;
 
 use std::collections::BTreeMap;
@@ -25,18 +25,18 @@ use phast_core::manifest::Script;
 
 use anyhow::Result;
 
-/// Looks up scripts by name and delegates execution to `Executor`.
+/// Looks up scripts by name and runs them in its `Environment`.
 #[derive(Debug)]
 pub struct ScriptRunner {
     scripts: Scripts,
-    executor: Executor,
+    environment: Environment,
 }
 
 #[rustfmt::skip]
 impl ScriptRunner {
-    /// Create a `ScriptRunner` with the given scripts map and executor.
-    pub fn new(scripts: BTreeMap<String, Script>, executor: Executor) -> Self {
-        Self { scripts: Scripts::new(scripts), executor }
+    /// Create a `ScriptRunner` with the given scripts map and environment.
+    pub fn new(scripts: BTreeMap<String, Script>, environment: Environment) -> Self {
+        Self { scripts: Scripts::new(scripts), environment }
     }
 
     /// Run a lifecycle hook, doing nothing when the manifest defines no script
@@ -52,8 +52,9 @@ impl ScriptRunner {
             return Ok(());
         };
 
+        let executor = Executor::new(&self.environment, invocation);
         for script in scripts {
-            self.executor.execute(&script, output)?;
+            executor.execute(&script, output)?;
         }
         Ok(())
     }
@@ -92,8 +93,9 @@ impl ScriptRunner {
                 };
         }
 
+        let executor = Executor::new(&self.environment, invocation);
         for script in &scripts {
-            self.executor.execute(script, output)?;
+            executor.execute(script, output)?;
         }
         Ok(())
     }

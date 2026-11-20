@@ -3,8 +3,8 @@
 //! The wiring is the same for every command, so a command declares which events it cares
 //! about and nothing more.
 //!
-//! The `Executor` behind those events is built with no directory, which means a hook runs
-//! from wherever phast was invoked rather than from the project it is acting on. Under
+//! The `Environment` behind those events is built with no directory, which means a hook runs
+//! from wherever Phast was invoked rather than from the project it is acting on. Under
 //! `phast install --project-dir <project>`, `post-install-cmd` runs in the invocation directory,
 //! where `vendor/` is not.
 
@@ -17,7 +17,7 @@ use std::sync::Arc;
 use phast_core::manifest::Script;
 use phast_runtime::context::{Invocation, LoaderRules};
 use phast_runtime::event::{LifecycleEvent, LifecycleEventManager};
-use phast_runtime::executor::Executor;
+use phast_runtime::executor::Environment;
 use phast_runtime::runner::ScriptRunner;
 
 /// Build a `LifecycleEventManager` wiring each event in `events` to the
@@ -44,7 +44,7 @@ pub fn register(
     }
 
     let mut lc = LifecycleEventManager::new();
-    let runner = Arc::new(ScriptRunner::new(scripts, Executor::new()));
+    let runner = Arc::new(ScriptRunner::new(scripts, Environment::new()));
 
     for &event in events {
         let runner  = Arc::clone(&runner);
