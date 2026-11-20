@@ -6,6 +6,7 @@
 //! entry it is handed. Printing `> {cmd}` happens here, before each command
 //! is run, so an entry echoes itself however it was classified.
 
+use crate::context::Project;
 use crate::hints;
 use crate::php;
 use crate::runner::ScriptEntry;
@@ -24,11 +25,14 @@ use anyhow::{Context, Result, bail};
 pub struct Executor {
     /// The PHP interpreter to invoke, resolved once at construction so a
     /// sequence of entries cannot disagree about which PHP they ran under.
-    php_bin: String,
+    php: String,
     /// Directory to run commands in. `None` means the process working
     /// directory, which is wherever Phast itself was invoked, not necessarily
     /// the project being acted on.
     dir: Option<PathBuf>,
+    /// The project a PHP callback is told about. `None` means callbacks get
+    /// no project data.
+    project: Option<Project>,
 }
 
 impl Executor {
@@ -37,14 +41,21 @@ impl Executor {
     /// says otherwise.
     pub fn new() -> Self {
         Self {
-            php_bin: php::binary(),
+            php: php::binary(),
             dir: None,
+            project: None,
         }
     }
 
     /// Run all commands in `dir` instead of the process working directory.
     pub fn with_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.dir = Some(dir.into());
+        self
+    }
+
+    /// Tell every PHP callback about `project`.
+    pub fn with_project(mut self, project: Project) -> Self {
+        self.project = Some(project);
         self
     }
 
@@ -90,7 +101,7 @@ impl Executor {
         let status = self
             .command("sh")
             .arg("-c")
-            .arg(format!("{} {args}", self.php_bin))
+            .arg(format!("{} {args}", self.php))
             .status()
             .context(hints::shell_start_failed())?;
         if !status.success() {
@@ -129,7 +140,7 @@ impl Executor {
         std::fs::write(&tmp, php)
             .context("failed to write PHP callback script")?;
 
-        let status = self.command(&self.php_bin)
+        let status = self.command(&self.php)
             .arg(&tmp)
             .status()
             .context(hints::shell_start_failed())?;

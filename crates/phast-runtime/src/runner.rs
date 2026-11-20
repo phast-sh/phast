@@ -14,6 +14,7 @@
 //! The order matters, `@php` is checked first, so `@php Foo::bar` runs PHP
 //! instead of calling `Foo::bar`.
 
+use crate::context::Invocation;
 use crate::executor::{Executor, ScriptOutput};
 use crate::scripts::Scripts;
 
@@ -46,8 +47,8 @@ impl ScriptRunner {
     /// [scripts]
     /// post-install-cmd = ["@php artisan migrate", "echo done"]
     /// ```
-    pub fn run(&self, event: &str, output: &impl ScriptOutput) -> Result<()> {
-        let Some(scripts) = self.scripts.resolve(event)? else {
+    pub fn run(&self, invocation: &Invocation, output: &impl ScriptOutput) -> Result<()> {
+        let Some(scripts) = self.scripts.resolve(&invocation.event)? else {
             return Ok(());
         };
 
@@ -57,8 +58,8 @@ impl ScriptRunner {
         Ok(())
     }
 
-    /// Run a named user script from `[scripts]`, appending `extra_args` to the
-    /// last command in the sequence.
+    /// Run a named user script from `[scripts]`, appending the invocation's
+    /// `arguments` to the last command in the sequence.
     ///
     /// ```toml
     /// [scripts]
@@ -71,15 +72,15 @@ impl ScriptRunner {
     ///
     /// An unknown name is not an error here; the caller decides what to say about
     /// a script the user asked for and the manifest does not define.
-    pub fn run_named(&self, cmd: &str, extra_args: &[String], output: &impl ScriptOutput) -> Result<()> {
-        let Some(mut scripts) = self.scripts.resolve(cmd)? else {
+    pub fn run_named(&self, invocation: &Invocation, output: &impl ScriptOutput) -> Result<()> {
+        let Some(mut scripts) = self.scripts.resolve(&invocation.event)? else {
             return Ok(());
         };
 
-        // Append extra_args to the last entry, if any were supplied.
-        if !extra_args.is_empty()
+        // Append the arguments to the last entry, if any were supplied.
+        if !invocation.arguments.is_empty()
             && let Some(script) = scripts.last_mut() {
-                let extra = extra_args.join(" ");
+                let extra = invocation.arguments.join(" ");
                 *script = match script {
                     ScriptEntry::Shell(cmd) => {
                         ScriptEntry::Shell(format!("{cmd} {extra}"))

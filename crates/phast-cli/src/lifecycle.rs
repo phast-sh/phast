@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use phast_core::manifest::Script;
+use phast_runtime::context::{Invocation, LoaderRules};
 use phast_runtime::event::{LifecycleEvent, LifecycleEventManager};
 use phast_runtime::executor::Executor;
 use phast_runtime::runner::ScriptRunner;
@@ -48,7 +49,14 @@ pub fn register(
     for &event in events {
         let runner  = Arc::clone(&runner);
         let printer = printer.clone();
-        lc.bind(event, move || runner.run(event.as_str(), &printer));
+        lc.bind(event, move || {
+            let invocation = Invocation {
+                event: event.as_str().to_owned(),
+                arguments: vec![],
+                rules: LoaderRules::default(),
+            };
+            runner.run(&invocation, &printer)
+        });
     }
     lc
 }
