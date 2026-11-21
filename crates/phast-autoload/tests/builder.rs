@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::fs::{create_dir_all, write};
+use std::path::{Path, PathBuf};
+use std::slice::from_ref;
 
 use phast_autoload::builder::Builder;
 use phast_core::lock::phast::{AutoloadSection, MetadataSection, PackageDef, PhastLock};
@@ -54,12 +56,30 @@ fn psr4(prefix: &str, dir: &str) -> AutoloadSection {
     }
 }
 
+/// One PSR-0 `prefix` mapped to `dir`, with no other autoload rules.
+fn psr0(prefix: &str, dir: &str) -> AutoloadSection {
+    AutoloadSection {
+        psr0: BTreeMap::from([(prefix.to_owned(), vec![dir.to_owned()])]),
+        ..Default::default()
+    }
+}
+
 /// The `files` autoload rule listing `paths`, with no other autoload rules.
 fn files(paths: &[&str]) -> AutoloadSection {
     AutoloadSection {
         files: paths.iter().map(|p| (*p).to_owned()).collect(),
         ..Default::default()
     }
+}
+
+/// A PHP file at `path` declaring an empty `class` in `namespace`.
+fn write_class(path: &Path, namespace: &str, class: &str) {
+    create_dir_all(path.parent().unwrap()).unwrap();
+    write(
+        path,
+        format!("<?php\nnamespace {namespace};\nclass {class} {{}}\n"),
+    )
+    .unwrap();
 }
 
 // ---------------------------------------------------------------------------
@@ -70,15 +90,12 @@ fn files(paths: &[&str]) -> AutoloadSection {
 fn root_psr4_entries_are_collected() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path().join("vendor");
-    std::fs::create_dir_all(&vendor).unwrap();
+    create_dir_all(&vendor).unwrap();
 
     let mut lock = lock();
-    lock.autoload = AutoloadSection {
-        psr4: BTreeMap::from([("App\\".to_owned(), vec!["app/".to_owned()])]),
-        ..Default::default()
-    };
+    lock.autoload = psr4("App\\", "app/");
 
-    let maps = Builder::new(&vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(&vendor, false).maps(&lock, &[]).unwrap();
     let dirs = maps
         .psr4
         .get("App\\")
@@ -91,15 +108,12 @@ fn root_psr4_entries_are_collected() {
 fn root_psr0_entries_are_collected() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path().join("vendor");
-    std::fs::create_dir_all(&vendor).unwrap();
+    create_dir_all(&vendor).unwrap();
 
     let mut lock = lock();
-    lock.autoload = AutoloadSection {
-        psr0: BTreeMap::from([("Legacy_".to_owned(), vec!["src/".to_owned()])]),
-        ..Default::default()
-    };
+    lock.autoload = psr0("Legacy_", "src/");
 
-    let maps = Builder::new(&vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(&vendor, false).maps(&lock, &[]).unwrap();
     let dirs = maps
         .psr0
         .get("Legacy_")
@@ -112,15 +126,12 @@ fn root_psr0_entries_are_collected() {
 fn root_files_entries_are_collected() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path().join("vendor");
-    std::fs::create_dir_all(&vendor).unwrap();
+    create_dir_all(&vendor).unwrap();
 
     let mut lock = lock();
-    lock.autoload = AutoloadSection {
-        files: vec!["bootstrap/helpers.php".to_owned()],
-        ..Default::default()
-    };
+    lock.autoload = files(&["bootstrap/helpers.php"]);
 
-    let maps = Builder::new(&vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(&vendor, false).maps(&lock, &[]).unwrap();
     assert_eq!(maps.files.len(), 1);
     let path = maps.files.values().next().unwrap();
     assert_eq!(path, "../bootstrap/helpers.php");
@@ -130,16 +141,15 @@ fn root_files_entries_are_collected() {
 fn root_dev_autoload_is_excluded_without_include_dev() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path().join("vendor");
-    std::fs::create_dir_all(&vendor).unwrap();
+    create_dir_all(&vendor).unwrap();
 
     let mut lock = lock();
     lock.autoload_dev = AutoloadSection {
-        psr4: BTreeMap::from([("Tests\\".to_owned(), vec!["tests/".to_owned()])]),
         files: vec!["tests/bootstrap.php".to_owned()],
-        ..Default::default()
+        ..psr4("Tests\\", "tests/")
     };
 
-    let maps = Builder::new(&vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(&vendor, false).maps(&lock, &[]).unwrap();
     assert!(
         maps.psr4.is_empty(),
         "root dev PSR-4 must not appear when include_dev=false",
@@ -154,16 +164,15 @@ fn root_dev_autoload_is_excluded_without_include_dev() {
 fn root_dev_autoload_is_included_with_include_dev() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path().join("vendor");
-    std::fs::create_dir_all(&vendor).unwrap();
+    create_dir_all(&vendor).unwrap();
 
     let mut lock = lock();
     lock.autoload_dev = AutoloadSection {
-        psr4: BTreeMap::from([("Tests\\".to_owned(), vec!["tests/".to_owned()])]),
         files: vec!["tests/bootstrap.php".to_owned()],
-        ..Default::default()
+        ..psr4("Tests\\", "tests/")
     };
 
-    let maps = Builder::new(&vendor, true).build(&lock, &[]).unwrap();
+    let maps = Builder::new(&vendor, true).maps(&lock, &[]).unwrap();
     let dirs = maps
         .psr4
         .get("Tests\\")
@@ -184,18 +193,12 @@ fn root_dev_autoload_is_included_with_include_dev() {
 fn psr4_entries_are_collected() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path();
-    std::fs::create_dir_all(vendor.join("acme/foo")).unwrap();
+    create_dir_all(vendor.join("acme/foo")).unwrap();
 
     let mut lock = lock();
-    lock.packages.push(package(
-        "acme/foo",
-        AutoloadSection {
-            psr4: BTreeMap::from([("Acme\\Foo\\".to_owned(), vec!["src/".to_owned()])]),
-            ..Default::default()
-        },
-    ));
+    lock.packages = vec![package("acme/foo", psr4("Acme\\Foo\\", "src/"))];
 
-    let maps = Builder::new(vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(vendor, false).maps(&lock, &[]).unwrap();
     let dirs = maps
         .psr4
         .get("Acme\\Foo\\")
@@ -208,26 +211,16 @@ fn psr4_entries_are_collected() {
 fn psr4_same_prefix_from_two_packages_merges() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path();
-    std::fs::create_dir_all(vendor.join("pkg/a")).unwrap();
-    std::fs::create_dir_all(vendor.join("pkg/b")).unwrap();
+    create_dir_all(vendor.join("pkg/a")).unwrap();
+    create_dir_all(vendor.join("pkg/b")).unwrap();
 
     let mut lock = lock();
-    lock.packages.push(package(
-        "pkg/a",
-        AutoloadSection {
-            psr4: BTreeMap::from([("Shared\\".to_owned(), vec!["src/".to_owned()])]),
-            ..Default::default()
-        },
-    ));
-    lock.packages.push(package(
-        "pkg/b",
-        AutoloadSection {
-            psr4: BTreeMap::from([("Shared\\".to_owned(), vec!["lib/".to_owned()])]),
-            ..Default::default()
-        },
-    ));
+    lock.packages = vec![
+        package("pkg/a", psr4("Shared\\", "src/")),
+        package("pkg/b", psr4("Shared\\", "lib/")),
+    ];
 
-    let maps = Builder::new(vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(vendor, false).maps(&lock, &[]).unwrap();
     let dirs = maps.psr4.get("Shared\\").expect("prefix must be present");
     assert_eq!(dirs.len(), 2, "both packages should contribute a directory");
 
@@ -244,18 +237,12 @@ fn psr4_same_prefix_from_two_packages_merges() {
 fn dev_packages_are_excluded_without_include_dev() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path();
-    std::fs::create_dir_all(vendor.join("dev/pkg")).unwrap();
+    create_dir_all(vendor.join("dev/pkg")).unwrap();
 
     let mut lock = lock();
-    lock.packages_dev.push(package(
-        "dev/pkg",
-        AutoloadSection {
-            psr4: BTreeMap::from([("Dev\\".to_owned(), vec!["src/".to_owned()])]),
-            ..Default::default()
-        },
-    ));
+    lock.packages_dev = vec![package("dev/pkg", psr4("Dev\\", "src/"))];
 
-    let maps = Builder::new(vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(vendor, false).maps(&lock, &[]).unwrap();
     assert!(
         maps.psr4.is_empty(),
         "dev PSR-4 must not appear when include_dev=false",
@@ -266,18 +253,12 @@ fn dev_packages_are_excluded_without_include_dev() {
 fn dev_packages_are_included_with_include_dev() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path();
-    std::fs::create_dir_all(vendor.join("dev/pkg")).unwrap();
+    create_dir_all(vendor.join("dev/pkg")).unwrap();
 
     let mut lock = lock();
-    lock.packages_dev.push(package(
-        "dev/pkg",
-        AutoloadSection {
-            psr4: BTreeMap::from([("Dev\\".to_owned(), vec!["src/".to_owned()])]),
-            ..Default::default()
-        },
-    ));
+    lock.packages_dev = vec![package("dev/pkg", psr4("Dev\\", "src/"))];
 
-    let maps = Builder::new(vendor, true).build(&lock, &[]).unwrap();
+    let maps = Builder::new(vendor, true).maps(&lock, &[]).unwrap();
     assert!(
         maps.psr4.contains_key("Dev\\"),
         "dev PSR-4 must appear when include_dev=true",
@@ -288,7 +269,7 @@ fn dev_packages_are_included_with_include_dev() {
 fn member_dev_autoload_is_excluded_without_include_dev() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path().join("vendor");
-    std::fs::create_dir_all(&vendor).unwrap();
+    create_dir_all(&vendor).unwrap();
 
     let logger = member(
         PathBuf::from("libs/logger"),
@@ -296,7 +277,7 @@ fn member_dev_autoload_is_excluded_without_include_dev() {
         psr4("Logger\\Tests\\", "tests/"),
     );
     let maps = Builder::new(&vendor, false)
-        .build(&lock(), std::slice::from_ref(&logger))
+        .maps(&lock(), from_ref(&logger))
         .unwrap();
 
     assert!(maps.psr4.contains_key("Logger\\"));
@@ -310,7 +291,7 @@ fn member_dev_autoload_is_excluded_without_include_dev() {
 fn member_dev_autoload_is_included_with_include_dev() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path().join("vendor");
-    std::fs::create_dir_all(&vendor).unwrap();
+    create_dir_all(&vendor).unwrap();
 
     let logger = member(
         PathBuf::from("libs/logger"),
@@ -318,7 +299,7 @@ fn member_dev_autoload_is_included_with_include_dev() {
         psr4("Logger\\Tests\\", "tests/"),
     );
     let maps = Builder::new(&vendor, true)
-        .build(&lock(), std::slice::from_ref(&logger))
+        .maps(&lock(), from_ref(&logger))
         .unwrap();
 
     assert!(
@@ -335,18 +316,12 @@ fn member_dev_autoload_is_included_with_include_dev() {
 fn files_entries_are_collected() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path();
-    std::fs::create_dir_all(vendor.join("acme/helpers")).unwrap();
+    create_dir_all(vendor.join("acme/helpers")).unwrap();
 
     let mut lock = lock();
-    lock.packages.push(package(
-        "acme/helpers",
-        AutoloadSection {
-            files: vec!["src/helpers.php".to_owned()],
-            ..Default::default()
-        },
-    ));
+    lock.packages = vec![package("acme/helpers", files(&["src/helpers.php"]))];
 
-    let maps = Builder::new(vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(vendor, false).maps(&lock, &[]).unwrap();
     assert_eq!(maps.files.len(), 1);
     let path = maps.files.values().next().unwrap();
     assert!(path.ends_with("acme/helpers/src/helpers.php"));
@@ -356,29 +331,19 @@ fn files_entries_are_collected() {
 fn the_same_file_from_two_packages_keeps_both_entries() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path();
-    std::fs::create_dir_all(vendor.join("pkg/a")).unwrap();
-    std::fs::create_dir_all(vendor.join("pkg/b")).unwrap();
+    create_dir_all(vendor.join("pkg/a")).unwrap();
+    create_dir_all(vendor.join("pkg/b")).unwrap();
 
     // Both declare `bootstrap.php`, but each resolves under its own package
     // directory, so the two absolute paths differ and neither key collides.
     // Nothing is deduplicated here: both files have to be required.
     let mut lock = lock();
-    lock.packages.push(package(
-        "pkg/a",
-        AutoloadSection {
-            files: vec!["bootstrap.php".to_owned()],
-            ..Default::default()
-        },
-    ));
-    lock.packages.push(package(
-        "pkg/b",
-        AutoloadSection {
-            files: vec!["bootstrap.php".to_owned()],
-            ..Default::default()
-        },
-    ));
+    lock.packages = vec![
+        package("pkg/a", files(&["bootstrap.php"])),
+        package("pkg/b", files(&["bootstrap.php"])),
+    ];
 
-    let maps = Builder::new(vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(vendor, false).maps(&lock, &[]).unwrap();
     assert_eq!(
         maps.files.len(),
         2,
@@ -390,24 +355,15 @@ fn the_same_file_from_two_packages_keeps_both_entries() {
 fn vendor_files_precede_root_files() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path().join("vendor");
-    std::fs::create_dir_all(vendor.join("acme/helpers")).unwrap();
+    create_dir_all(vendor.join("acme/helpers")).unwrap();
 
     let mut lock = lock();
-    lock.autoload = AutoloadSection {
-        files: vec!["bootstrap/autoload.php".to_owned()],
-        ..Default::default()
-    };
-    lock.packages.push(package(
-        "acme/helpers",
-        AutoloadSection {
-            files: vec!["src/helpers.php".to_owned()],
-            ..Default::default()
-        },
-    ));
+    lock.autoload = files(&["bootstrap/autoload.php"]);
+    lock.packages = vec![package("acme/helpers", files(&["src/helpers.php"]))];
 
     // The root depends on its packages, so its files load last: vendor package
     // files come first, the root file (a `../` path) last.
-    let maps = Builder::new(&vendor, false).build(&lock, &[]).unwrap();
+    let maps = Builder::new(&vendor, false).maps(&lock, &[]).unwrap();
     let paths: Vec<&str> = maps.files.values().map(|s| s.as_str()).collect();
     assert_eq!(paths.len(), 2);
     assert!(
@@ -426,20 +382,11 @@ fn vendor_files_precede_root_files() {
 fn member_files_fall_between_vendor_and_root() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path().join("vendor");
-    std::fs::create_dir_all(vendor.join("acme/helpers")).unwrap();
+    create_dir_all(vendor.join("acme/helpers")).unwrap();
 
     let mut lock = lock();
-    lock.autoload = AutoloadSection {
-        files: vec!["bootstrap.php".to_owned()],
-        ..Default::default()
-    };
-    lock.packages.push(package(
-        "acme/helpers",
-        AutoloadSection {
-            files: vec!["src/helpers.php".to_owned()],
-            ..Default::default()
-        },
-    ));
+    lock.autoload = files(&["bootstrap.php"]);
+    lock.packages = vec![package("acme/helpers", files(&["src/helpers.php"]))];
 
     // A workspace member depends on the external packages and is depended on by
     // the root, so its files land after vendor packages and before the root.
@@ -450,7 +397,7 @@ fn member_files_fall_between_vendor_and_root() {
     );
 
     let maps = Builder::new(&vendor, false)
-        .build(&lock, std::slice::from_ref(&logger))
+        .maps(&lock, from_ref(&logger))
         .unwrap();
     let paths: Vec<&str> = maps.files.values().map(|s| s.as_str()).collect();
 
@@ -468,34 +415,28 @@ fn member_files_fall_between_vendor_and_root() {
 fn excluded_dir_kept_out_of_psr4_optimized_classmap() {
     let tmp = TempDir::new().unwrap();
     let vendor = tmp.path();
-    let pkg = vendor.join("acme/contracts");
+    let pkg = vendor.join("acme/api");
 
     // A real class and a Test/ helper both live under the PSR-4 root.
-    write_class(&pkg.join("src/Service.php"), "Acme\\Contracts", "Service");
-    write_class(
-        &pkg.join("src/Test/Fixture.php"),
-        "Acme\\Contracts\\Test",
-        "Fixture",
-    );
+    write_class(&pkg.join("src/Service.php"), "Acme\\Api", "Service");
+    write_class(&pkg.join("src/Test/Stub.php"), "Acme\\Api\\Test", "Stub");
 
     let mut lock = lock();
     lock.packages.push(package(
-        "acme/contracts",
+        "acme/api",
         AutoloadSection {
-            psr4: BTreeMap::from([("Acme\\Contracts\\".to_owned(), vec!["src/".to_owned()])]),
             exclude: vec!["/src/Test/".to_owned()],
-            ..Default::default()
+            ..psr4("Acme\\Api\\", "src/")
         },
     ));
 
-    let maps = Builder::new(vendor, false).build(&lock, &[]).unwrap();
-
+    let maps = Builder::new(vendor, false).maps(&lock, &[]).unwrap();
     assert!(
-        maps.classmap.contains_key("Acme\\Contracts\\Service"),
+        maps.classmap.contains_key("Acme\\Api\\Service"),
         "non-excluded class must be in the optimized classmap",
     );
     assert!(
-        !maps.classmap.contains_key("Acme\\Contracts\\Test\\Fixture"),
+        !maps.classmap.contains_key("Acme\\Api\\Test\\Stub"),
         "class under an excluded directory must not be in the classmap",
     );
 }
@@ -507,41 +448,80 @@ fn excluded_path_kept_out_of_declared_classmap_scan() {
     let pkg = vendor.join("acme/lib");
 
     write_class(&pkg.join("lib/Real.php"), "Acme\\Lib", "Real");
-    write_class(
-        &pkg.join("lib/fixtures/Sample.php"),
-        "Acme\\Lib\\Fixtures",
-        "Sample",
-    );
+    write_class(&pkg.join("lib/stubs/Stub.php"), "Acme\\Lib\\Stubs", "Stub");
 
     let mut lock = lock();
     lock.packages.push(package(
         "acme/lib",
         AutoloadSection {
             classmap: vec!["lib/".to_owned()],
-            exclude: vec!["lib/fixtures/".to_owned()],
+            exclude: vec!["lib/stubs/".to_owned()],
             ..Default::default()
         },
     ));
 
-    let maps = Builder::new(vendor, false).build(&lock, &[]).unwrap();
-
+    let maps = Builder::new(vendor, false).maps(&lock, &[]).unwrap();
     assert!(
         maps.classmap.contains_key("Acme\\Lib\\Real"),
         "non-excluded class must be scanned into the classmap",
     );
     assert!(
-        !maps.classmap.contains_key("Acme\\Lib\\Fixtures\\Sample"),
+        !maps.classmap.contains_key("Acme\\Lib\\Stubs\\Stub"),
         "class under an excluded path must not be scanned into the classmap",
     );
 }
 
-fn write_class(path: &std::path::Path, ns: &str, class: &str) {
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(
-        path,
-        format!("<?php\nnamespace {ns};\nclass {class} {{}}\n"),
-    )
-    .unwrap();
+// ---------------------------------------------------------------------------
+// PSR-4 and PSR-0 rules, without scanning anything
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rules_list_psr4_and_psr0_from_packages_and_the_root() {
+    let vendor = PathBuf::from("/project/vendor");
+
+    let mut lock = lock();
+    lock.packages = vec![
+        package("acme/api", psr4("Acme\\Api\\", "src/")),
+        package("acme/old", psr0("Old_", "lib/")),
+    ];
+    lock.autoload = psr4("App\\", "app/");
+
+    let rules = Builder::new(&vendor, false).rules(&lock, &[]).unwrap();
+    assert_eq!(
+        rules.psr4,
+        BTreeMap::from([
+            ("Acme\\Api\\".to_owned(), vec![vendor.join("acme/api/src/")]),
+            ("App\\".to_owned(), vec![PathBuf::from("/project/app/")]),
+        ]),
+    );
+    assert_eq!(
+        rules.psr0,
+        BTreeMap::from([("Old_".to_owned(), vec![vendor.join("acme/old/lib/")])]),
+    );
+}
+
+#[test]
+fn rules_include_dev_packages_only_with_include_dev() {
+    let vendor = PathBuf::from("/project/vendor");
+
+    let mut lock = lock();
+    lock.packages_dev = vec![package("acme/test", psr4("Acme\\Test\\", "src/"))];
+
+    assert!(
+        Builder::new(&vendor, false)
+            .rules(&lock, &[])
+            .unwrap()
+            .psr4
+            .is_empty(),
+    );
+    assert_eq!(
+        Builder::new(&vendor, true)
+            .rules(&lock, &[])
+            .unwrap()
+            .psr4
+            .len(),
+        1,
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -557,23 +537,19 @@ fn the_same_tree_builds_the_same_maps_twice() {
     write_class(&pkg.join("src/Two.php"), "Acme\\Lib", "Two");
 
     let mut lock = lock();
-    lock.autoload = AutoloadSection {
-        files: vec!["bootstrap.php".to_owned()],
-        ..Default::default()
-    };
+    lock.autoload = files(&["bootstrap.php"]);
     lock.packages.push(package(
         "acme/lib",
         AutoloadSection {
-            psr4: BTreeMap::from([("Acme\\Lib\\".to_owned(), vec!["src/".to_owned()])]),
             files: vec!["helpers.php".to_owned()],
-            ..Default::default()
+            ..psr4("Acme\\Lib\\", "src/")
         },
     ));
 
-    // The PSR roots are scanned in parallel and the maps are keyed by hash, so a
-    // second build is the only thing that shows the output does not drift.
-    let a = Builder::new(&vendor, false).build(&lock, &[]).unwrap();
-    let b = Builder::new(&vendor, false).build(&lock, &[]).unwrap();
+    // The PSR roots are scanned in parallel and the maps are keyed by hash,
+    // so a second build is the only thing that shows the output doesn't drift.
+    let a = Builder::new(&vendor, false).maps(&lock, &[]).unwrap();
+    let b = Builder::new(&vendor, false).maps(&lock, &[]).unwrap();
 
     assert_eq!(a.classmap, b.classmap);
     assert_eq!(a.psr4, b.psr4);

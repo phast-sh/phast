@@ -1,128 +1,39 @@
-//! Autoload map builder.
+//! Full autoload maps, with the classmap scanned.
 //!
-//! Walks `phast.lock` and collects PSR-4, PSR-0, classmap, and files entries
-//! from every package into a single `AutoloadMaps` struct that the writer
-//! can render to PHP without any further I/O.
+//! The writer turns them into PHP files as they are, without reading anything from disk.
 
+use super::sources::Collect;
 use crate::scanner::{Duplicate, Exclude, Scanner};
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use phast_core::lock::phast::{AutoloadSection, PackageDef, PhastLock};
-use phast_workspace::MemberAutoload;
+use phast_core::lock::phast::AutoloadSection;
 
 use anyhow::Result;
 use indexmap::IndexMap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use sha2::{Digest, Sha256};
 
-/// Builds [`AutoloadMaps`] from a lock file.
-///
-/// Everything is configured up front by [`Builder::new`];
-/// the builder is then consumed by [`build`](Builder::build), which returns the collected maps.
-pub struct Builder {
+/// Fills [`AutoloadMaps`].
+pub(super) struct Maps {
     /// Root directory under which each package lives as `<vendor>/<name>`.
     vendor_dir: PathBuf,
-    /// When `true`, dev packages contribute to the autoloader.
-    include_dev: bool,
-    /// Accumulates autoload entries as packages are processed.
+    /// The maps filled so far.
     autoload_maps: AutoloadMaps,
-    /// PSR-4 / PSR-0 roots collected from autoload rules, scanned into the
-    /// classmap at the end of [`build`](Builder::build) (optimize-by-default).
+    /// PSR-4 and PSR-0 directories, scanned into the classmap by `finish`.
     psr_roots: Vec<PsrRoot>,
 }
 
-impl Builder {
-    /// Create a builder over `vendor_dir`, folding in dev packages when `include_dev`.
-    pub fn new(vendor_dir: &Path, include_dev: bool) -> Self {
+impl Maps {
+    /// Empty maps for the packages in `vendor_dir`.
+    pub(super) fn new(vendor_dir: &Path) -> Self {
         Self {
             vendor_dir: vendor_dir.to_path_buf(),
-            include_dev,
             autoload_maps: AutoloadMaps::default(),
             psr_roots: Vec::new(),
         }
-    }
-
-    /// Build autoload maps from `lock` and the workspace `members`.
-    ///
-    /// Sources fold in dependency-topological order so a package's `files`
-    /// autoloads run after everything it depends on:
-    ///  - external packages first (the lock stores them dependencies-before-dependents)
-    ///  - then workspace members
-    ///  - then the root package last
-    ///
-    /// Each depends only on what came before it.
-    #[rustfmt::skip]
-    pub fn build(
-        mut self,
-        lock: &PhastLock,
-        members: &[MemberAutoload],
-    ) -> Result<AutoloadMaps> {
-        // External packages first, in lock order (dependencies before dependents).
-        // They carry production autoload rules only.
-        let packages = self.installed_packages(lock);
-        for package in packages {
-            let dir = self.vendor_dir.join(&package.name);
-            self.collect_section(&package.autoload, &dir)?;
-        }
-
-        // Workspace members next: they depend on the externals above.
-        for member in members {
-            self.collect_source(&member.dir, &member.autoload, &member.autoload_dev)?;
-        }
-
-        // The root package last: it depends on everything above.
-        let root = self
-            .vendor_dir
-            .parent()
-            .unwrap_or(&self.vendor_dir)
-            .to_path_buf();
-        self.collect_source(&root, &lock.autoload, &lock.autoload_dev)?;
-
-        // Scan the collected PSR roots into the classmap, so at runtime every
-        // known class resolves with one hash lookup instead of filesystem probes.
-        self.collect_psr_roots();
-
-        Ok(self.autoload_maps)
-    }
-
-    /// The lock's packages to process: production entries, plus dev entries when
-    /// `include_dev` is set. Selection only; nothing is folded into the maps.
-    fn installed_packages<'a>(&self, lock: &'a PhastLock) -> Vec<&'a PackageDef> {
-        let mut packages = lock.packages.iter().collect::<Vec<_>>();
-        if self.include_dev {
-            packages.extend(lock.packages_dev.iter());
-        }
-        packages
-    }
-
-    /// Collect a source's production rules, plus its dev rules when `include_dev` is set.
-    /// Used for the root and each workspace member.
-    fn collect_source(
-        &mut self,
-        dir: &Path,
-        autoload: &AutoloadSection,
-        autoload_dev: &AutoloadSection,
-    ) -> Result<()> {
-        self.collect_section(autoload, dir)?;
-        if self.include_dev {
-            self.collect_section(autoload_dev, dir)?;
-        }
-        Ok(())
-    }
-
-    /// Fold one autoload section (PSR-4, PSR-0, classmap, files) rooted at `dir`.
-    fn collect_section(&mut self, autoload: &AutoloadSection, dir: &Path) -> Result<()> {
-        // The package's exclude patterns are resolved against its own root and
-        // shared (by every PSR root and the classmap scan) for the whole section.
-        let exclude = Exclude::new(dir, &autoload.exclude)?.map(Arc::new);
-        self.collect_psr4(autoload, dir, &exclude);
-        self.collect_psr0(autoload, dir, &exclude);
-        self.collect_classmap(autoload, dir, &exclude)?;
-        self.collect_files(autoload, dir);
-        Ok(())
     }
 
     /// Collect PSR-4 autoload rules from `autoload`, rooted at `base_dir`.
@@ -256,6 +167,30 @@ impl Builder {
     }
 }
 
+impl Collect for Maps {
+    type Output = AutoloadMaps;
+
+    fn add(&mut self, autoload: &AutoloadSection, dir: &Path) -> Result<()> {
+        // The package's exclude patterns are resolved against its own root and
+        // shared (by every PSR root and the classmap scan) for the whole section.
+        let exclude = Exclude::new(dir, &autoload.exclude)?.map(Arc::new);
+        self.collect_psr4(autoload, dir, &exclude);
+        self.collect_psr0(autoload, dir, &exclude);
+        self.collect_classmap(autoload, dir, &exclude)?;
+        self.collect_files(autoload, dir);
+        Ok(())
+    }
+
+    /// Scan the PSR directories into the classmap, then return the maps.
+    ///
+    /// With every class in the classmap, PHP finds each one with a single lookup instead
+    /// of checking the disk.
+    fn finish(mut self) -> AutoloadMaps {
+        self.collect_psr_roots();
+        self.autoload_maps
+    }
+}
+
 /// All autoload maps collected from a lock file, ready to be written to disk.
 #[derive(Debug, Default)]
 pub struct AutoloadMaps {
@@ -270,8 +205,9 @@ pub struct AutoloadMaps {
     /// Files: stable key -> vendor-relative file path, in collection order.
     ///
     /// `IndexMap` preserves insertion order so the PHP autoloader requires
-    /// files in the dependency-topological sequence [`Builder::build`] folds
-    /// them in, keeping a package's files after those of its dependencies.
+    /// files in the dependency-topological sequence
+    /// [`Builder::maps`](crate::builder::Builder::maps) folds them in, keeping a package's
+    /// files after those of its dependencies.
     pub files: IndexMap<String, String>,
     /// Duplicate class declarations found while scanning classmaps: the same class in
     /// more than one file. Diagnostic only; the caller surfaces these as warnings and

@@ -1,7 +1,7 @@
 //! Script entry classification, expansion, and orchestration.
 //!
 //! `ScriptEntry` classifies a raw manifest string into an execution variant.
-//! `ScriptRunner` owns the scripts map and an `Executor`, and is the public
+//! `ScriptRunner` owns the scripts map and an `Environment`, and is the public
 //! entry point for running lifecycle hooks.
 //!
 //! ## Classification order
@@ -14,7 +14,8 @@
 //! The order matters, `@php` is checked first, so `@php Foo::bar` runs PHP
 //! instead of calling `Foo::bar`.
 
-use crate::executor::{Executor, ScriptOutput};
+use crate::context::Invocation;
+use crate::executor::{Environment, Executor, ScriptOutput};
 use crate::scripts::Scripts;
 
 use std::collections::BTreeMap;
@@ -24,18 +25,18 @@ use phast_core::manifest::Script;
 
 use anyhow::Result;
 
-/// Looks up scripts by name and delegates execution to `Executor`.
+/// Looks up scripts by name and runs them in its `Environment`.
 #[derive(Debug)]
 pub struct ScriptRunner {
     scripts: Scripts,
-    executor: Executor,
+    environment: Environment,
 }
 
 #[rustfmt::skip]
 impl ScriptRunner {
-    /// Create a `ScriptRunner` with the given scripts map and executor.
-    pub fn new(scripts: BTreeMap<String, Script>, executor: Executor) -> Self {
-        Self { scripts: Scripts::new(scripts), executor }
+    /// Create a `ScriptRunner` with the given scripts map and environment.
+    pub fn new(scripts: BTreeMap<String, Script>, environment: Environment) -> Self {
+        Self { scripts: Scripts::new(scripts), environment }
     }
 
     /// Run a lifecycle hook, doing nothing when the manifest defines no script
@@ -46,19 +47,20 @@ impl ScriptRunner {
     /// [scripts]
     /// post-install-cmd = ["@php artisan migrate", "echo done"]
     /// ```
-    pub fn run(&self, event: &str, output: &impl ScriptOutput) -> Result<()> {
-        let Some(scripts) = self.scripts.resolve(event)? else {
+    pub fn run(&self, invocation: &Invocation, output: &impl ScriptOutput) -> Result<()> {
+        let Some(scripts) = self.scripts.resolve(&invocation.event)? else {
             return Ok(());
         };
 
+        let executor = Executor::new(&self.environment, invocation);
         for script in scripts {
-            self.executor.execute(&script, output)?;
+            executor.execute(&script, output)?;
         }
         Ok(())
     }
 
-    /// Run a named user script from `[scripts]`, appending `extra_args` to the
-    /// last command in the sequence.
+    /// Run a named user script from `[scripts]`, appending the invocation's
+    /// `arguments` to the last command in the sequence.
     ///
     /// ```toml
     /// [scripts]
@@ -71,15 +73,15 @@ impl ScriptRunner {
     ///
     /// An unknown name is not an error here; the caller decides what to say about
     /// a script the user asked for and the manifest does not define.
-    pub fn run_named(&self, cmd: &str, extra_args: &[String], output: &impl ScriptOutput) -> Result<()> {
-        let Some(mut scripts) = self.scripts.resolve(cmd)? else {
+    pub fn run_named(&self, invocation: &Invocation, output: &impl ScriptOutput) -> Result<()> {
+        let Some(mut scripts) = self.scripts.resolve(&invocation.event)? else {
             return Ok(());
         };
 
-        // Append extra_args to the last entry, if any were supplied.
-        if !extra_args.is_empty()
+        // Append the arguments to the last entry, if any were supplied.
+        if !invocation.arguments.is_empty()
             && let Some(script) = scripts.last_mut() {
-                let extra = extra_args.join(" ");
+                let extra = invocation.arguments.join(" ");
                 *script = match script {
                     ScriptEntry::Shell(cmd) => {
                         ScriptEntry::Shell(format!("{cmd} {extra}"))
@@ -91,8 +93,9 @@ impl ScriptRunner {
                 };
         }
 
+        let executor = Executor::new(&self.environment, invocation);
         for script in &scripts {
-            self.executor.execute(script, output)?;
+            executor.execute(script, output)?;
         }
         Ok(())
     }

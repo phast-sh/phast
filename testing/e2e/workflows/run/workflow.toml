@@ -1,0 +1,34 @@
+description = "A PHP callback sees the project it runs in, on a fresh install, and fails clearly on what it cannot get."
+tier        = "focused"
+network     = false
+php         = true
+
+# A fresh project, no vendor/ yet. The callback prints what it sees.
+[[step]]
+args   = ["install"]
+stdout = [
+    "event: pre-autoload-dump",
+    "dev: yes",
+    "package: acme/shop",
+    'extra: {"acme-hooks":{"services":["S3","Sqs"],"note":"say \"hi\" \\ back"}}',
+    "vendor-dir: vendor",
+]
+
+# The callback deleted Unused.php, so the autoloader shouldn't know about it.
+[[step]]
+args   = ["run", "probe"]
+stdout = ["missing"]
+
+# Dev mode follows --no-dev.
+[[step]]
+args   = ["autoload", "--no-dev"]
+stdout = ["dev: no"]
+
+# Phast doesn't provide getLocker(). The error should say so and point to --no-scripts.
+[[step]]
+args   = ["run", "locker"]
+status = 1
+stderr = [
+    "Acme\\Hooks\\Report::locker (locker) needs Composer\\Composer::getLocker()",
+    "--no-scripts",
+]
