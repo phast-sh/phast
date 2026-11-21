@@ -28,8 +28,9 @@ impl<'a> Callback<'a> {
     /// the real one is absent, and invokes the method via reflection so handlers that accept
     /// no arguments also work without a type error.
     ///
-    /// The temporary file is removed whether or not the callback succeeded, and
-    /// its name carries a nanosecond timestamp so concurrent runs cannot collide.
+    /// The project and this run go to PHP as a JSON file next to the bootstrap. Both files
+    /// are removed whether or not the callback succeeded, and their name carries a
+    /// nanosecond timestamp so concurrent runs cannot collide.
     #[rustfmt::skip]
     pub(super) fn call(&self, callback: &str, output: &impl ScriptOutput) -> Result<()> {
         output.info(&format!("> {callback}"));
@@ -38,26 +39,36 @@ impl<'a> Callback<'a> {
             .split_once("::")
             .context("invalid PHP callback: expected 'Vendor\\Class::method'")?;
 
-        let php = include_str!("../stubs/callback_bootstrap.php")
+        let php_bootstrap = include_str!("../stubs/callback_bootstrap.php")
             .replace("{class}", class)
             .replace("{method}", method);
 
-        let tmp = std::env::temp_dir().join(format!(
+        let tmp_callback = std::env::temp_dir().join(format!(
             "phast_cb_{}.php",
             SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_nanos()
         ));
-        std::fs::write(&tmp, php)
+        std::fs::write(&tmp_callback, php_bootstrap)
             .context("failed to write PHP callback script")?;
 
+        let ctx_path = tmp_callback.with_extension("json");
+        let ctx_json = serde_json::json!({
+            "project":    self.environment.project,
+            "invocation": self.invocation,
+        });
+        std::fs::write(&ctx_path, ctx_json.to_string())
+            .context("failed to write PHP callback context")?;
+
         let status = self.environment.command(&self.environment.php)
-            .arg(&tmp)
+            .arg(&tmp_callback)
+            .arg(&ctx_path)
             .status()
             .context(hints::shell_start_failed())?;
 
-        let _ = std::fs::remove_file(&tmp);
+        let _ = std::fs::remove_file(&tmp_callback);
+        let _ = std::fs::remove_file(&ctx_path);
 
         if !status.success() {
             bail!(hints::script_failed(status));

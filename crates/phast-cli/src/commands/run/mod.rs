@@ -3,7 +3,7 @@
 //! `Workspace::scope` decides both which manifest is read and where the commands run.
 //! Narrowed to a member, by `--member` or by a working directory inside one, it answers with
 //! that member's `[scripts]`; unnarrowed it answers with the root's, which the merged
-//! manifest carries through untouched. The executor is handed `scope.dir()`, so a script
+//! manifest carries through untouched. The environment is handed `scope.dir()`, so a script
 //! narrowed to `packages/logger` runs from that directory while `phast.lock` and `vendor/`
 //! stay at the workspace root, and a relative `vendor/bin/phpunit` will not resolve from
 //! there.
@@ -16,6 +16,7 @@ mod printer;
 
 use crate::args::{MemberArg, ProjectArg};
 use crate::hints;
+use crate::lifecycle;
 use crate::output::Printer;
 use crate::project;
 
@@ -59,8 +60,17 @@ pub async fn run(args: RunArgs, printer: &Printer) -> Result<()> {
         bail!(hints::script_not_found(&script));
     }
 
+    // A script run by name always sees dev packages,
+    // as there is no `--no-dev` to ask otherwise.
+    let project = lifecycle::project(
+        scope.manifest(),
+        workspace.root(),
+        true,
+    );
+
     let environment = Environment::new()
-        .with_dir(scope.dir());
+        .with_dir(scope.dir())
+        .with_project(project);
 
     let invocation = Invocation {
         event: script,

@@ -60,12 +60,12 @@ type LifecycleEventHandler = Arc<dyn Fn() -> Result<()>>;
 /// ```
 /// use phast_runtime::event::{LifecycleEventManager, LifecycleEvent};
 ///
-/// let mut lifecycle = LifecycleEventManager::new();
-/// lifecycle.bind(LifecycleEvent::PostInstallCmd, || {
+/// let mut manager = LifecycleEventManager::new();
+/// manager.bind(LifecycleEvent::PostInstallCmd, || {
 ///     println!("install done");
 ///     Ok(())
 /// });
-/// lifecycle.fire(LifecycleEvent::PostInstallCmd).unwrap();
+/// manager.fire(LifecycleEvent::PostInstallCmd).unwrap();
 /// ```
 #[derive(Default, Clone)]
 pub struct LifecycleEventManager {
