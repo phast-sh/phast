@@ -56,8 +56,12 @@ pub async fn run(args: AutoloadArgs, printer: &Printer) -> Result<()> {
             workspace.root(),
             args.dev.include(),
         );
+        let loader = lifecycle::Loader::new(
+            &workspace,
+            args.dev.include(),
+        )?;
 
-        lifecycle::register(scripts, project, printer, &[
+        lifecycle::register(scripts, project, loader, printer, &[
             LifecycleEvent::PreAutoloadDump,
             LifecycleEvent::PostAutoloadDump,
         ])

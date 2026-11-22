@@ -22,7 +22,7 @@ use crate::project;
 
 use printer::RunPrinter;
 
-use phast_runtime::context::{Invocation, LoaderRules};
+use phast_runtime::context::Invocation;
 use phast_runtime::executor::Environment;
 use phast_runtime::runner::ScriptRunner;
 use phast_workspace::Workspace;
@@ -67,6 +67,10 @@ pub async fn run(args: RunArgs, printer: &Printer) -> Result<()> {
         workspace.root(),
         true,
     );
+    let loader = lifecycle::Loader::new(
+        &workspace,
+        true,
+    )?;
 
     let environment = Environment::new()
         .with_dir(scope.dir())
@@ -75,7 +79,7 @@ pub async fn run(args: RunArgs, printer: &Printer) -> Result<()> {
     let invocation = Invocation {
         event: script,
         arguments: args.extra_args,
-        rules: LoaderRules::default(),
+        rules: loader.rules()?,
     };
 
     let runner = ScriptRunner::new(scripts.clone(), environment);
