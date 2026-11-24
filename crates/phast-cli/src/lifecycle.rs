@@ -91,10 +91,13 @@ pub fn register(
 
 /// The project scripts run in: `manifest`'s data, the vendor and bin directories
 /// under `root`, and whether dev packages are part of the command.
-pub fn project(manifest: &Manifest, root: &Path, dev_mode: bool) -> Project {
-    let vendor_dir = root.join("vendor");
+///
+/// The directories are absolute, so a callback can use them from wherever PHP runs.
+/// Fails when `root` is relative and the current directory can't be read.
+pub fn project(manifest: &Manifest, root: &Path, dev_mode: bool) -> Result<Project> {
+    let vendor_dir = std::path::absolute(root)?.join("vendor");
 
-    Project {
+    Ok(Project {
         name: manifest.name.clone(),
         version: manifest.version.clone(),
         extra: manifest.extra.clone(),
@@ -104,7 +107,7 @@ pub fn project(manifest: &Manifest, root: &Path, dev_mode: bool) -> Project {
         bin_dir: vendor_dir.join("bin"),
         vendor_dir,
         dev_mode,
-    }
+    })
 }
 
 /// Each requirement as its package name and constraint, sorted by name.

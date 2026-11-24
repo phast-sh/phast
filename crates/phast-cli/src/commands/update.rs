@@ -61,7 +61,7 @@ pub async fn run(args: UpdateArgs, cache_dir: PathBuf, printer: &Printer) -> Res
             workspace.manifest(),
             workspace.root(),
             args.dev.include(),
-        );
+        )?;
         let loader = lifecycle::Loader::new(
             &workspace,
             args.dev.include(),

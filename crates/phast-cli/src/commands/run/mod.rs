@@ -66,7 +66,7 @@ pub async fn run(args: RunArgs, printer: &Printer) -> Result<()> {
         scope.manifest(),
         workspace.root(),
         true,
-    );
+    )?;
     let loader = lifecycle::Loader::new(
         &workspace,
         true,

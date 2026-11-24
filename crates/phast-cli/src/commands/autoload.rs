@@ -55,7 +55,7 @@ pub async fn run(args: AutoloadArgs, printer: &Printer) -> Result<()> {
             workspace.manifest(),
             workspace.root(),
             args.dev.include(),
-        );
+        )?;
         let loader = lifecycle::Loader::new(
             &workspace,
             args.dev.include(),
