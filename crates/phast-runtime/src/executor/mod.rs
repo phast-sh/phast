@@ -84,6 +84,7 @@ pub struct Executor<'a> {
     invocation: &'a Invocation,
 }
 
+#[rustfmt::skip]
 impl<'a> Executor<'a> {
     /// An executor for the run `invocation` describes, in `environment`.
     pub fn new(environment: &'a Environment, invocation: &'a Invocation) -> Self {
@@ -94,7 +95,6 @@ impl<'a> Executor<'a> {
     }
 
     /// Run one entry of the script.
-    #[rustfmt::skip]
     pub fn execute(&self, entry: &ScriptEntry, output: &impl ScriptOutput) -> Result<()> {
         match entry {
             ScriptEntry::Shell(cmd)       => self.execute_shell(cmd, output),
@@ -115,7 +115,7 @@ impl<'a> Executor<'a> {
             .status()
             .context(hints::shell_start_failed())?;
         if !status.success() {
-            bail!(hints::script_failed(status));
+            bail!(hints::script_failed(cmd, &self.invocation.event, status));
         }
         Ok(())
     }
@@ -132,7 +132,7 @@ impl<'a> Executor<'a> {
             .status()
             .context(hints::shell_start_failed())?;
         if !status.success() {
-            bail!(hints::script_failed(status));
+            bail!(hints::script_failed(&format!("@php {args}"), &self.invocation.event, status));
         }
         Ok(())
     }

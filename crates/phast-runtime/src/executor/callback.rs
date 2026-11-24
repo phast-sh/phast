@@ -83,7 +83,7 @@ impl<'a> Callback<'a> {
         let _ = std::fs::remove_dir_all(&callback_dir);
 
         if !status.success() {
-            bail!(hints::script_failed(status));
+            bail!(hints::script_failed(callback, &self.invocation.event, status));
         }
         Ok(())
     }

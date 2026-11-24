@@ -2,19 +2,20 @@
 
 use std::process::ExitStatus;
 
-/// A script process ran and exited non-zero.
-///
-/// `ExitStatus` renders itself as `exit status: 3` or `signal: 9 (SIGKILL)`,
-/// so it supplies its own noun and the surrounding sentence should not repeat one.
-pub fn script_failed(status: ExitStatus) -> String {
-    format!("script exited with status {status}")
-}
-
 /// A process the executor tried to spawn never started, so nothing ran at all.
 ///
 /// Covers every spawn it attempts, the PHP interpreter as much as the shell.
 pub fn shell_start_failed() -> &'static str {
     "failed to start shell"
+}
+
+/// A script entry ran and exited non-zero, or was stopped by a signal.
+#[rustfmt::skip]
+pub fn script_failed(entry: &str, event: &str, status: ExitStatus) -> String {
+    match status.code() {
+        Some(code) => format!("script {entry} ({event}) failed with exit code {code}"),
+        None       => format!("script {entry} ({event}) was stopped ({status})"),
+    }
 }
 
 /// A script calls `@name`, but no script has that name.

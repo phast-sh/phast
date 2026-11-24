@@ -37,4 +37,5 @@ status = 1
 stderr = [
     "Acme\\Hooks\\Report::locker (unsupported) needs Composer\\Composer::getLocker()",
     "--no-scripts",
+    "script Acme\\Hooks\\Report::locker (unsupported) failed with exit code 1",
 ]
