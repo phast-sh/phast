@@ -10,7 +10,7 @@ stdout = [
     "event: pre-autoload-dump",
     "dev: yes",
     "package: acme/shop",
-    'extra: {"acme-hooks":{"services":["S3","Sqs"],"note":"say \"hi\" \\ back"}}',
+    'extra: {"acme-hooks":{"note":"say \"hi\" \\ back","services":["S3","Sqs"]}}',
     "vendor-dir: vendor",
 ]
 

@@ -1,13 +1,68 @@
 //! Data passed to PHP callbacks.
 //!
-//! [`Project`] is the same for every script a command runs.
-//! [`Invocation`] describes a single run, like which event fired it.
+//! [`Project`] is built once per command and shared by every script the command runs.
+//! [`Invocation`] is built for each run.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde::Serialize;
 use serde_json::Value as JsonValue;
+
+/// What a PHP callback's bootstrap reads: the method to call, the project, and this run.
+///
+/// For `phast run dump` in `/var/www/acme`, the JSON looks like this. `project` is `null`
+/// when the environment has none, and `extra` and `version` are `null` when the
+/// manifest doesn't declare them.
+///
+/// ```json
+/// {
+///   "callback": { "class": "Acme\\Probe\\Hook", "method": "run" },
+///   "project": {
+///     "name": "acme/probe",
+///     "version": null,
+///     "extra": null,
+///     "require": {},
+///     "require_dev": {},
+///     "autoload": {
+///       "psr-4": { "Acme\\Probe\\": ["src/"] },
+///       "psr-0": {},
+///       "classmap": [],
+///       "files": [],
+///       "exclude-from-classmap": []
+///     },
+///     "vendor_dir": "/var/www/acme/vendor",
+///     "bin_dir": "/var/www/acme/vendor/bin",
+///     "dev_mode": true
+///   },
+///   "invocation": {
+///     "event": "dump",
+///     "arguments": [],
+///     "rules": {
+///       "psr4": { "Acme\\Probe\\": ["/var/www/acme/src/"] },
+///       "psr0": {}
+///     }
+///   }
+/// }
+/// ```
+#[derive(Debug, Serialize)]
+pub struct CallbackContext<'a> {
+    /// The static method to call.
+    pub callback: Target<'a>,
+    /// The project, or `null` when the environment has none.
+    pub project: Option<&'a Project>,
+    /// This run of the script.
+    pub invocation: &'a Invocation,
+}
+
+/// A static method, as its class and its name.
+#[derive(Debug, Serialize)]
+pub struct Target<'a> {
+    /// The class, such as `Acme\Hooks\Report`.
+    pub class: &'a str,
+    /// The method, such as `show`.
+    pub method: &'a str,
+}
 
 /// The project every script in one command runs in.
 #[derive(Debug, Clone, Serialize)]
@@ -16,7 +71,7 @@ pub struct Project {
     pub name: Option<String>,
     /// The root package's version, if it declares one.
     pub version: Option<String>,
-    /// The root package's `extra`, as written.
+    /// The root package's `extra`, as written, or `null` when the manifest has none.
     pub extra: JsonValue,
     /// The root package's requirements: package name -> constraint.
     pub require: BTreeMap<String, String>,
