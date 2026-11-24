@@ -24,11 +24,17 @@ stdout = ["missing"]
 args   = ["autoload", "--no-dev"]
 stdout = ["dev: no"]
 
+# A class that doesn't exist fails with a short message, instead of a PHP trace.
+[[step]]
+args   = ["run", "missing"]
+status = 1
+stderr = ["Script Acme\\Hooks\\Missing::run (missing) can't run: class Acme\\Hooks\\Missing not found."]
+
 # Phast doesn't provide getLocker(). The error should say so and point to --no-scripts.
 [[step]]
-args   = ["run", "locker"]
+args   = ["run", "unsupported"]
 status = 1
 stderr = [
-    "Acme\\Hooks\\Report::locker (locker) needs Composer\\Composer::getLocker()",
+    "Acme\\Hooks\\Report::locker (unsupported) needs Composer\\Composer::getLocker()",
     "--no-scripts",
 ]

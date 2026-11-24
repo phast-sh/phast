@@ -42,18 +42,23 @@ require __DIR__ . '/Composer.php';
  */
 $ctx = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR);
 
+// The most specific prefix is tried first, so Acme\Hooks\ wins over Acme\ when both match.
+$psr4 = $ctx['invocation']['rules']['psr4'];
+$psr0 = $ctx['invocation']['rules']['psr0'];
+uksort($psr4, fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+uksort($psr0, fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+
 /**
  * Load a class from the PSR-4 and PSR-0 rules in the context.
  *
- * The rules' directories are absolute. A prefix can match without its directory holding
- * the class, so every matching prefix is tried until a file is found.
+ * The rules' directories are absolute. The most specific prefix is tried first, and a
+ * prefix can match without its directory holding the class, so every matching prefix is
+ * tried until a file is found.
  */
-spl_autoload_register(static function (string $class) use ($ctx): void {
-    $rules = $ctx['invocation']['rules'];
-
+spl_autoload_register(static function (string $class) use ($psr4, $psr0): void {
     // PSR-4: the part after the prefix becomes the path, so for the prefix
     // "Acme\Hooks\", Acme\Hooks\Report is Report.php in the prefix's directory.
-    foreach ($rules['psr4'] as $prefix => $dirs) {
+    foreach ($psr4 as $prefix => $dirs) {
         if (!str_starts_with($class, $prefix)) {
             continue;
         }
@@ -75,7 +80,7 @@ spl_autoload_register(static function (string $class) use ($ctx): void {
     $name      = $split === false ? $class : substr($class, $split + 1);
     $file      = str_replace('\\', '/', $namespace) . str_replace('_', '/', $name) . '.php';
 
-    foreach ($rules['psr0'] as $prefix => $dirs) {
+    foreach ($psr0 as $prefix => $dirs) {
         if (!str_starts_with($class, $prefix)) {
             continue;
         }
@@ -111,14 +116,43 @@ $event = new \Phast\Script\Event(
     new \Phast\Script\IO(),
 );
 
-$callback = $ctx['callback']['class'] . '::' . $ctx['callback']['method'];
+$class    = $ctx['callback']['class'];
+$method   = $ctx['callback']['method'];
+$callback = $class . '::' . $method;
+
+/**
+ * Print `$message` to standard error and stop with exit code 1.
+ *
+ * A closure rather than a function, so it can't clash with a function of the same name
+ * that a package declares.
+ */
+$fail = static function (string $message): void {
+    fwrite(STDERR, $message . PHP_EOL);
+    exit(1);
+};
+
+// Checked before the call, not caught around it, so a ReflectionException thrown by the
+// callback itself isn't reported as a missing class. class_exists() runs the loader above.
+if (!class_exists($class)) {
+    $fail(sprintf(
+        "Script %s (%s) can't run: class %s not found.",
+        $callback,
+        $event->name(),
+        $class,
+    ));
+}
+if (!method_exists($class, $method)) {
+    $fail(sprintf(
+        "Script %s (%s) can't run: %s has no method %s().",
+        $callback,
+        $event->name(),
+        $class,
+        $method,
+    ));
+}
 
 try {
-    $rfm = new \ReflectionMethod(
-        $ctx['callback']['class'],
-        $ctx['callback']['method'],
-    );
-
+    $rfm = new \ReflectionMethod($class, $method);
     // A callback that takes no parameter is called without the event, so it doesn't
     // fail on an argument it never asked for. Every other one gets Composer's Event.
     $rfm->getNumberOfParameters() > 0
@@ -126,12 +160,11 @@ try {
         : $rfm->invoke(null)
         ;
 } catch (\Phast\Script\Unsupported $unsupported) {
-    fwrite(STDERR, sprintf(
+    $fail(sprintf(
         "Script %s (%s) needs %s, which Phast does not provide to scripts yet.\n" .
-        "Skip scripts with --no-scripts, and please report it: https://github.com/phast-sh/phast/issues\n",
+        "Skip scripts with --no-scripts, and please report it: https://github.com/phast-sh/phast/issues",
         $callback,
         $event->name(),
         $unsupported->method(),
     ));
-    exit(1);
 }

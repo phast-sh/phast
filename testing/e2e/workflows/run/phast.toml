@@ -20,5 +20,6 @@ note     = 'say "hi" \ back'
 # Literal strings, so the backslashes stay single.
 [scripts]
 pre-autoload-dump = 'Acme\Hooks\Report::show'
-locker            = 'Acme\Hooks\Report::locker'
+unsupported       = 'Acme\Hooks\Report::locker'
+missing           = 'Acme\Hooks\Missing::run'
 probe             = '@php probe.php'
