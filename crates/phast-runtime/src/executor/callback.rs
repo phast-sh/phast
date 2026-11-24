@@ -65,8 +65,16 @@ impl<'a> Callback<'a> {
         std::fs::write(&context_path, serde_json::to_string(&context_body)?)
             .context("failed to write PHP callback context")?;
 
+        // PHP's CLI does both: logs an error to stderr and displays it on stdout;
+        // so it would print twice. Log nothing, and display it on stderr instead.
+        let php_ini = [
+            "-d", "log_errors=0",
+            "-d", "display_errors=stderr",
+        ];
+
         let bootstrap_path = callback_dir.join("bootstrap.php");
         let status = self.environment.command(&self.environment.php)
+            .args(php_ini)
             .arg(bootstrap_path)
             .arg(&context_path)
             .status()
