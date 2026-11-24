@@ -1,7 +1,7 @@
 //! Autoload map builder.
 //!
-//! [`Builder`] gives you either the full maps or just the PSR rules. Both are built from
-//! the same [`Sources`], so they never disagree about which packages are included.
+//! [`Builder`] gives you either the full maps or just the PSR rules. Both are built
+//! from the same [`Sources`], so they never disagree about which packages are included.
 
 mod maps;
 mod rules;
