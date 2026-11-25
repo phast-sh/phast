@@ -1,0 +1,25 @@
+#:schema https://phast.sh/schema/v1/manifest.json
+[package]
+name    = "acme/shop"
+version = "2.1.0"
+type    = "project"
+
+[require]
+"acme/hooks" = "^1.0"
+
+# A local package, so no registry is needed.
+[[repositories]]
+type = "path"
+url  = "packages/hooks"
+
+# The callback prints this back. The note has quotes and a backslash, to catch bad escaping.
+[extra.acme-hooks]
+services = ["S3", "Sqs"]
+note     = 'say "hi" \ back'
+
+# Literal strings, so the backslashes stay single.
+[scripts]
+pre-autoload-dump = 'Acme\Hooks\Report::show'
+unsupported       = 'Acme\Hooks\Report::locker'
+missing           = 'Acme\Hooks\Missing::run'
+probe             = '@php probe.php'

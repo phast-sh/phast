@@ -1,0 +1,58 @@
+# How `git cliff` turns commit subjects into CHANGELOG.md entries.
+#
+# Only features, fixes and breaking changes are listed: the rest
+# (docs, tests, ci, chores, refactors) changes nothing a user runs.
+
+[changelog]
+header = """
+# Changelog
+"""
+body = """
+{% if version -%}
+    {% set number = version | trim_start_matches(pat="v") -%}
+    {% set date   = timestamp | date(format="%Y-%m-%d") -%}
+    ## [{{ number }}](https://github.com/phast-sh/phast/releases/tag/{{ version }})
+
+    Released on {{ date }}.
+{% else -%}
+    ## Unreleased
+{% endif -%}
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim }}
+
+    {% for commit in commits -%}
+        - {{ commit.message | upper_first }}
+    {% endfor -%}
+{% endfor -%}
+"""
+# Off, so the blank line after the header and between entries survives.
+trim           = false
+postprocessors = [
+    # The body template is indented for reading; the Markdown it renders is not.
+    { pattern = '(?m)^ +', replace = "" },
+    # `(#<N>)` at the end of a squashed subject becomes a link to the pull request.
+    { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/phast-sh/phast/pull/${1}))" },
+]
+
+[git]
+conventional_commits     = true
+filter_unconventional    = true
+protect_breaking_commits = true
+
+tag_pattern  = "v[0-9].*"
+sort_commits = "oldest"
+
+commit_parsers = [
+    { field   = "breaking", group = "<!-- 0 -->Breaking changes", pattern = "true" },
+    { message = "^feat",    group = "<!-- 1 -->Features" },
+    { message = "^fix",     group = "<!-- 2 -->Bug fixes" },
+    # GitHub's default merge title, which `v0.1.0` was tagged under.
+    { message = "^Merge",   skip = true },
+    { message = ".*",       skip = true },
+]
+
+[bump]
+# Before 1.0, a feature bumps the patch and a breaking change the minor, rather than
+# git-cliff's minor and 1.0.0. No effect from 1.0 on.
+features_always_bump_minor = false
+breaking_always_bump_major = false

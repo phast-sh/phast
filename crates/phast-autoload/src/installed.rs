@@ -1,4 +1,5 @@
-//! `vendor/phast/installed.php` and `vendor/composer/installed.json` generation.
+//! `vendor/phast/installed.php` and `vendor/composer/installed.json` generation, and
+//! reading back what the last install recorded.
 //!
 //! Many packages call `\Composer\InstalledVersions::getVersion('vendor/pkg')`
 //! at runtime to check what is installed. This call reads `installed.php`.
@@ -14,6 +15,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use phast_core::lock::phast::{PackageDef, PhastLock};
+use phast_core::package::PackageName;
 
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
@@ -204,6 +206,39 @@ impl Installed {
             .map(|p| p.name.as_str())
             .collect()
     }
+}
+
+/// The package names the last install recorded in `vendor/composer/installed.json`.
+///
+/// Empty when the file is missing or cannot be read, rather than guessing the names
+/// from what is on disk. Only well-formed `vendor/package` names come back.
+#[rustfmt::skip]
+pub fn written(vendor_dir: &Path) -> Vec<PackageName> {
+    let path = vendor_dir
+        .join("composer")
+        .join("installed.json");
+
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let Ok(json) = serde_json::from_str::<Value>(&text) else {
+        return Vec::new();
+    };
+
+    // Composer 2 wraps the list in `packages`;
+    // Composer 1 wrote the bare array.
+    let packages = json
+        .get("packages")
+        .unwrap_or(&json);
+
+    packages
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|package| package.get("name")?.as_str())
+        .filter(|name| PackageName::is_well_formed(name))
+        .map(PackageName::new)
+        .collect()
 }
 
 /// The commit reference to record for `package`: the dist's, falling back to the

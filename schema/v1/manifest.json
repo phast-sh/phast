@@ -340,16 +340,23 @@
       }
     },
     "Script": {
-      "description": "A single command, or a list of commands run in order.\n\nA command is a shell line, an `@php` invocation, or a `Vendor\\Class::method` callback.",
+      "description": "A single command, a list of commands run in order, or a map of commands.\n\nA command is a shell line, an `@php` invocation, a `Vendor\\Class::method` callback,\nor `@name` to run another script.",
       "anyOf": [
         {
           "description": "One command.",
           "type": "string"
         },
         {
-          "description": "Commands run in the order given.",
+          "description": "Commands run in the given order.",
           "type": "array",
           "items": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "Commands mapped to a value that says how to run each, in the written order.",
+          "type": "object",
+          "additionalProperties": {
             "type": "string"
           }
         }

@@ -43,6 +43,24 @@ const MANIFEST_WITH_HOOKS: &str = indoc! {r#"
     post-install-cmd = "echo POST_HOOK"
 "#};
 
+/// A project requiring one package, with Symfony Flex's `auto-scripts` map run from
+/// the install hook through a reference.
+const MANIFEST_WITH_SYMFONY_FLEX: &str = indoc! {r#"
+    [package]
+    name = "acme/my-project"
+    type = "project"
+
+    [require]
+    "vendor/alpha" = "^1.0"
+
+    [scripts]
+    post-install-cmd = ["@auto-scripts"]
+
+    [scripts.auto-scripts]
+    "cache:clear" = "symfony-cmd"
+    "assets:install %PUBLIC_DIR%" = "symfony-cmd"
+"#};
+
 /// A project requiring one package.
 fn project() -> Project {
     Project::new().manifest(MANIFEST)
@@ -150,6 +168,22 @@ async fn install_dry_run_from_a_fresh_lock_writes_nothing() {
         !project.root().join("vendor").exists(),
         "a dry run installed into vendor/",
     );
+}
+
+#[tokio::test]
+async fn install_on_a_symfony_project_warns_about_its_flex_scripts() {
+    let registry = registry().await;
+    let project = Project::new().manifest(MANIFEST_WITH_SYMFONY_FLEX);
+
+    project
+        .cmd()
+        .args(["install", "--registry-url", &registry.uri()])
+        .assert()
+        .success()
+        .stderr(contains("Skipping 'auto-scripts'"))
+        .stderr(contains("'cache:clear', 'assets:install %PUBLIC_DIR%'"));
+
+    assert!(project.root().join("vendor/vendor/alpha").exists());
 }
 
 #[tokio::test]
@@ -285,4 +319,79 @@ async fn install_member_without_a_name_is_refused() {
         .assert()
         .failure()
         .stderr(contains("no [package].name"));
+}
+
+// ---------------------------------------------------------------------------
+// Emptying vendor/ of what left the lock
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn install_no_dev_removes_the_dev_packages() {
+    let registry = workspace_registry().await;
+    let project = Project::new().manifest(MANIFEST_WITH_DEV);
+
+    project
+        .cmd()
+        .args(["install", "--registry-url", &registry.uri()])
+        .assert()
+        .success();
+    assert!(project.root().join("vendor/vendor/beta").is_dir());
+
+    project
+        .cmd()
+        .args(["install", "--no-dev", "--registry-url", &registry.uri()])
+        .assert()
+        .success();
+
+    assert!(
+        !project.root().join("vendor/vendor/beta").exists(),
+        "a dev package survived --no-dev",
+    );
+    assert!(project.root().join("vendor/vendor/alpha").is_dir());
+}
+
+#[tokio::test]
+async fn install_keeps_a_directory_it_did_not_place() {
+    let registry = registry().await;
+    let project = project();
+
+    project
+        .cmd()
+        .args(["install", "--registry-url", &registry.uri()])
+        .assert()
+        .success();
+
+    let project = project.write("vendor/acme/patched/README", "placed by hand");
+
+    project
+        .cmd()
+        .args(["install", "--registry-url", &registry.uri()])
+        .assert()
+        .success();
+
+    assert!(project.root().join("vendor/acme/patched/README").exists());
+}
+
+#[tokio::test]
+async fn install_member_keeps_what_another_member_uses() {
+    let registry = workspace_registry().await;
+    let project = workspace();
+
+    project
+        .cmd()
+        .args(["install", "--registry-url", &registry.uri()])
+        .assert()
+        .success();
+
+    project
+        .cmd()
+        .args(["install", "--member", "packages/api"])
+        .args(["--registry-url", &registry.uri()])
+        .assert()
+        .success();
+
+    assert!(
+        project.root().join("vendor/vendor/beta").is_dir(),
+        "a scoped install removed a sibling's package",
+    );
 }

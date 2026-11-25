@@ -23,23 +23,107 @@ A value is either a single command string or an array of commands run in sequenc
 sequence stops at the first command that exits non-zero, and the Phast command that
 triggered it fails with that exit status.
 
-## The three command forms
+## Command forms
 
-| Form            | Example                | How it runs                                                    |
-|-----------------|------------------------|----------------------------------------------------------------|
-| `@php ...`      | `@php artisan migrate` | The resolved PHP binary, with the rest as arguments            |
-| Static callback | `Vendor\Class::method` | A short PHP bootstrap loads `vendor/autoload.php` and calls it |
-| Shell command   | `cp .env.example .env` | Passed to `sh -c`, so shell syntax works                       |
+| Form            | Example                | How it runs                                         |
+|-----------------|------------------------|-----------------------------------------------------|
+| `@php ...`      | `@php artisan migrate` | The resolved PHP binary, with the rest as arguments |
+| `@name`         | `@lint`                | The script called `lint`, in its place              |
+| Static callback | `Vendor\Class::method` | Phast loads the class and calls the method          |
+| Shell command   | `cp .env.example .env` | Passed to `sh -c`, so shell syntax works            |
 
 `@php` is resolved to the `PHAST_PHP_BIN` environment variable when set, otherwise
 `php` on your `PATH`; the same binary Phast uses for platform detection. Static
-callbacks receive a minimal `Composer\Script\Event` stub when the real class is not
-installed, so common Composer-era callbacks run unchanged.
+callbacks are covered in [PHP callbacks](#php-callbacks) below.
+
+A script can run another one with `@name`, and that one can run others in turn:
+
+```toml
+[scripts]
+lint = "vendor/bin/phpstan analyse"
+test = ["@lint", "@php vendor/bin/phpunit"]
+```
+
+`phast run test` runs `lint` first, then PHPUnit.
 
 !!! note
-    Script references (a script whose value is `"@another-script"`) are not supported
-    yet; inline the commands instead. Scripts that invoke the `composer` binary only
-    work if Composer happens to be installed.
+    Scripts that invoke the `composer` binary only work if Composer happens to be
+    installed.
+
+## PHP callbacks
+
+A callback is a public static method, written the way Composer packages write them:
+
+```toml
+[scripts]
+pre-autoload-dump = "Aws\\Script\\Composer\\Composer::removeUnusedServices"
+
+[extra]
+"aws/aws-sdk-php" = ["S3"]
+```
+
+```php
+use Composer\Script\Event;
+
+public static function removeUnusedServices(Event $event): void
+{
+    $extra = $event->getComposer()->getPackage()->getExtra();
+    $names = $extra['aws/aws-sdk-php'] ?? [];
+    $event->getIO()->write('Keeping AWS services: ' . implode(', ', $names));
+}
+```
+
+Phast finds the class through the autoload rules of the installed packages, so a
+callback runs even on a first install, before `vendor/autoload.php` exists. It doesn't
+load classes listed only in a `classmap`, or `files` entries.
+
+The event gives a callback:
+
+| Method                                          | Returns                                                                                                           |
+|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `getName()`                                     | The event, or the script's name under `phast run`                                                                 |
+| `getArguments()`                                | The arguments after `--` in `phast run`                                                                           |
+| `isDevMode()`                                   | `false` under `--no-dev`                                                                                          |
+| `getIO()->write()`, `writeError()`              | Prints to the terminal                                                                                            |
+| `getIO()->ask()`, `askConfirmation()`           | The default answer; Phast never stops to ask                                                                      |
+| `getComposer()->getPackage()`                   | The root package: `getName()`, `getVersion()`, `getExtra()`, `getRequires()`, `getDevRequires()`, `getAutoload()` |
+| `getComposer()->getConfig()->get('vendor-dir')` | The absolute vendor path; `bin-dir` works too                                                                     |
+
+A callback that calls anything else stops with a message naming the method:
+
+```console
+Script Acme\Hooks\Report::locker (post-install-cmd) needs Composer\Composer::getLocker(), which Phast does not provide to scripts yet.
+Skip scripts with --no-scripts, and please report it: https://github.com/phast-sh/phast/issues
+```
+
+And if the class can't be found, Phast says which one:
+
+```console
+Script Acme\Hooks\Missing::run (post-install-cmd) can't run: class Acme\Hooks\Missing not found.
+```
+
+## Scripts written as a map
+
+Symfony projects have a script written as a map rather than a command or a list: each
+command is mapped to how Symfony Flex, a Composer plugin, should run it.
+
+```toml
+[scripts]
+post-install-cmd = ["@auto-scripts"]
+
+[scripts.auto-scripts]
+"cache:clear" = "symfony-cmd"
+"assets:install %PUBLIC_DIR%" = "symfony-cmd"
+```
+
+Phast reads and keeps these, but doesn't run them. `phast install` and `phast update` say
+so, and list the commands so you can run them yourself:
+
+```console
+Skipping 'auto-scripts': Phast doesn't support map scripts. Run these yourself if you need them: 'cache:clear', 'assets:install %PUBLIC_DIR%'
+```
+
+For a Symfony project, those are console commands: `php bin/console cache:clear`.
 
 ## Lifecycle hooks
 

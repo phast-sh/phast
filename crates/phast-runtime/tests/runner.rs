@@ -44,12 +44,18 @@ fn the_at_php_prefix_is_checked_before_the_double_colon() {
 }
 
 #[test]
-fn a_bare_at_php_is_left_to_the_shell() {
+fn a_bare_at_php_is_a_reference() {
     // The prefix includes its trailing space, so `@php` with nothing after it is
-    // not a PHP command; it goes to the shell and fails there, where the user
-    // sees the command they actually wrote.
+    // not a PHP command. It reads as a reference to a script named `php`, and
+    // fails as a missing script unless the manifest has one.
     let entry: ScriptEntry = "@php".parse().unwrap();
-    assert_eq!(entry, ScriptEntry::Shell("@php".to_owned()));
+    assert_eq!(entry, ScriptEntry::Reference("php".to_owned()));
+}
+
+#[test]
+fn an_at_name_makes_a_reference_to_another_script() {
+    let entry: ScriptEntry = "@auto-scripts".parse().unwrap();
+    assert_eq!(entry, ScriptEntry::Reference("auto-scripts".to_owned()));
 }
 
 // ---------------------------------------------------------------------------

@@ -10,9 +10,11 @@
 //! unless `post-autoload-dump` runs `php artisan package:discover`, so executing hooks
 //! correctly is a prerequisite for real projects rather than a convenience.
 
+pub mod context;
 pub mod event;
 pub mod executor;
 pub mod php;
 pub mod runner;
+pub mod scripts;
 
 mod hints;

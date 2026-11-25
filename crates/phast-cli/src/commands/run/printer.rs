@@ -57,6 +57,7 @@ impl Display for ScriptsOutput<'_> {
                 let command = match script {
                     Script::Single(s)   => s.as_str(),
                     Script::Multiple(m) => m.first().map(String::as_str).unwrap_or(""),
+                    Script::Map(m)      => m.keys().next().map(String::as_str).unwrap_or(""),
                 };
 
                 format!(

@@ -131,6 +131,19 @@ async fn lock_writes_the_lock_without_downloading() {
 }
 
 #[tokio::test]
+async fn lock_writes_no_cursor_codes_to_a_pipe() {
+    let registry = registry().await;
+    let project = project();
+
+    project
+        .cmd()
+        .args(["lock", "--registry-url", &registry.uri()])
+        .assert()
+        .success()
+        .stderr(contains("\x1b[?25").not());
+}
+
+#[tokio::test]
 async fn lock_records_the_resolved_packages() {
     let registry = registry().await;
     let project = project();
@@ -382,6 +395,39 @@ async fn lock_names_no_age_window_when_none_is_set() {
         .stderr(contains("minimum-package-age").not());
 }
 
+/// The first registry carries the package, so holding its only release back must not hand
+/// the lookup to the next registry, which would install a same-named package instead.
+#[tokio::test]
+async fn lock_stops_at_the_registry_whose_releases_are_too_recent() {
+    let owner = published(&[("1.0.0", PUBLISHED_TOO_RECENTLY)]).await;
+    let other = published(&[("9.9.9", PUBLISHED_LONG_AGO)]).await;
+    let project = chain(&owner, &other, Some("1d"));
+
+    project
+        .cmd()
+        .arg("lock")
+        .assert()
+        .failure()
+        .stderr(contains("inside minimum-package-age"));
+
+    assert!(
+        !project.root().join("phast.lock").exists(),
+        "nothing may be locked from the later registry",
+    );
+}
+
+#[tokio::test]
+async fn lock_takes_the_first_registry_without_an_age_window() {
+    let owner = published(&[("1.0.0", PUBLISHED_TOO_RECENTLY)]).await;
+    let other = published(&[("9.9.9", PUBLISHED_LONG_AGO)]).await;
+    let project = chain(&owner, &other, None);
+
+    project.cmd().arg("lock").assert().success();
+
+    let lock: toml::Value = toml::from_str(&project.read("phast.lock")).expect("lock is TOML");
+    assert_eq!(lock["packages"][0]["version"].as_str(), Some("1.0.0"));
+}
+
 /// A registry serving `vendor/alpha` at each version in `versions`, published at the time
 /// paired with it.
 async fn published(versions: &[(&str, &str)]) -> MockRegistry {
@@ -399,7 +445,12 @@ async fn published(versions: &[(&str, &str)]) -> MockRegistry {
 /// `age` when given.
 fn requiring(requires: &str, age: Option<&str>) -> Project {
     let config = age
-        .map(|age| format!("[config]\nminimum-package-age = \"{age}\"\n"))
+        .map(|age| {
+            formatdoc! {r#"
+                [config]
+                minimum-package-age = "{age}"
+            "#}
+        })
         .unwrap_or_default();
 
     Project::new().manifest(&formatdoc! {r#"
@@ -412,6 +463,37 @@ fn requiring(requires: &str, age: Option<&str>) -> Project {
 
         {config}
     "#})
+}
+
+/// A project requiring any `vendor/alpha` from `owner` first and `other` second, with
+/// `minimum-package-age` set to `age` when given.
+fn chain(owner: &MockRegistry, other: &MockRegistry, age: Option<&str>) -> Project {
+    let config = age
+        .map(|age| {
+            formatdoc! {r#"
+                [config]
+                minimum-package-age = "{age}"
+            "#}
+        })
+        .unwrap_or_default();
+
+    Project::new().manifest(&formatdoc! {r#"
+        [package]
+        name = "acme/my-project"
+        type = "project"
+
+        [require]
+        "vendor/alpha" = "*"
+
+        {config}
+        [[repositories]]
+        type = "composer"
+        url  = "{owner}"
+
+        [[repositories]]
+        type = "composer"
+        url  = "{other}"
+    "#, owner = owner.uri(), other = other.uri()})
 }
 
 // ---------------------------------------------------------------------------

@@ -42,6 +42,20 @@ impl PackageName {
     pub fn is_valid(name: &str) -> bool {
         name.contains('/') || is_platform(name)
     }
+
+    /// Whether `name` is exactly `vendor/package` in Composer's naming rules.
+    ///
+    /// Each segment starts and ends with a lowercase letter or digit, with `_`, `.` and `-`
+    /// allowed between. Stricter than [`is_valid`](Self::is_valid): no third segment, no
+    /// empty one, no `.` or `..`, so a name that passes stays inside any directory it is
+    /// joined onto.
+    pub fn is_well_formed(name: &str) -> bool {
+        let Some((vendor, package)) = name.split_once('/') else {
+            return false;
+        };
+
+        is_name_segment(vendor) && is_name_segment(package)
+    }
 }
 
 /// Parses a package identifier, normalizing it to lowercase
@@ -147,4 +161,13 @@ pub fn is_composer(name: &str) -> bool {
 /// (e.g. `php-debugbar/php-debugbar`).
 pub fn is_platform(name: &str) -> bool {
     is_php(name) || is_ext(name) || is_lib(name) || is_composer(name)
+}
+
+/// Whether `segment` is one half of a well-formed `vendor/package` name.
+fn is_name_segment(segment: &str) -> bool {
+    let is_edge = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit();
+
+    segment.starts_with(is_edge)
+        && segment.ends_with(is_edge)
+        && segment.chars().all(|c| is_edge(c) || "_.-".contains(c))
 }

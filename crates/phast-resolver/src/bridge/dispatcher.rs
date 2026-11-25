@@ -93,10 +93,16 @@ impl<P: Provider + Clone + 'static> Dispatcher<P> {
             return ProviderResponse::Metadata(self.registry.synthetic_metadata(name, version));
         }
 
-        let meta = match self.provider.metadata(name, version).await {
+        let mut meta = match self.provider.metadata(name, version).await {
             Ok(m)  => m,
             Err(e) => return ProviderResponse::Err(format!("{e:#}")),
         };
+
+        // A package already has its own name, so it adds nothing listing itself under
+        // `replace` or `provide`. It would count as replaced by itself and be dropped
+        // from the result.
+        meta.replace.retain(|(replaced, _)| replaced != name);
+        meta.provide.retain(|(provided, _)| provided != name);
 
         self.registry.record_provides(name, &meta.replace);
         self.registry.record_provides(name, &meta.provide);

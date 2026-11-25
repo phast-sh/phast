@@ -1,20 +1,22 @@
 //! Script entry classification, expansion, and orchestration.
 //!
 //! `ScriptEntry` classifies a raw manifest string into an execution variant.
-//! `ScriptRunner` owns the scripts map and an `Executor`, and is the public
+//! `ScriptRunner` owns the scripts map and an `Environment`, and is the public
 //! entry point for running lifecycle hooks.
 //!
 //! ## Classification order
 //!
 //! 1. `@php ` prefix  → `PhpCommand`
-//! 2. contains `::`   → `PhpCallback`
-//! 3. everything else → `Shell`
+//! 2. any other `@`   → `Reference`
+//! 3. contains `::`   → `PhpCallback`
+//! 4. everything else → `Shell`
 //!
-//! The prefix includes its trailing space, so a bare `@php` falls through to `Shell`
-//! and fails at the shell rather than here. The order matters too, since it is what
-//! makes `@php Foo::bar` a command rather than a callback.
+//! The order matters, `@php` is checked first, so `@php Foo::bar` runs PHP
+//! instead of calling `Foo::bar`.
 
-use crate::executor::{Executor, ScriptOutput};
+use crate::context::Invocation;
+use crate::executor::{Environment, Executor, ScriptOutput};
+use crate::scripts::Scripts;
 
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -23,18 +25,18 @@ use phast_core::manifest::Script;
 
 use anyhow::Result;
 
-/// Looks up scripts by name and delegates execution to `Executor`.
+/// Looks up scripts by name and runs them in its `Environment`.
 #[derive(Debug)]
 pub struct ScriptRunner {
-    scripts: BTreeMap<String, Script>,
-    executor: Executor,
+    scripts: Scripts,
+    environment: Environment,
 }
 
 #[rustfmt::skip]
 impl ScriptRunner {
-    /// Create a `ScriptRunner` with the given scripts map and executor.
-    pub fn new(scripts: BTreeMap<String, Script>, executor: Executor) -> Self {
-        Self { scripts, executor }
+    /// Create a `ScriptRunner` with the given scripts map and environment.
+    pub fn new(scripts: BTreeMap<String, Script>, environment: Environment) -> Self {
+        Self { scripts: Scripts::new(scripts), environment }
     }
 
     /// Run a lifecycle hook, doing nothing when the manifest defines no script
@@ -45,20 +47,20 @@ impl ScriptRunner {
     /// [scripts]
     /// post-install-cmd = ["@php artisan migrate", "echo done"]
     /// ```
-    pub fn run(&self, event: &str, output: &impl ScriptOutput) -> Result<()> {
-        let Some(def) = self.scripts.get(event) else {
+    pub fn run(&self, invocation: &Invocation, output: &impl ScriptOutput) -> Result<()> {
+        let Some(scripts) = self.scripts.resolve(&invocation.event)? else {
             return Ok(());
         };
 
-        let scripts = ScriptEntry::from_def(def);
+        let executor = Executor::new(&self.environment, invocation);
         for script in scripts {
-            self.executor.execute(&script, output)?;
+            executor.execute(&script, output)?;
         }
         Ok(())
     }
 
-    /// Run a named user script from `[scripts]`, appending `extra_args` to the
-    /// last command in the sequence.
+    /// Run a named user script from `[scripts]`, appending the invocation's
+    /// `arguments` to the last command in the sequence.
     ///
     /// ```toml
     /// [scripts]
@@ -71,26 +73,29 @@ impl ScriptRunner {
     ///
     /// An unknown name is not an error here; the caller decides what to say about
     /// a script the user asked for and the manifest does not define.
-    pub fn run_named(&self, cmd: &str, extra_args: &[String], output: &impl ScriptOutput) -> Result<()> {
-        let Some(def) = self.scripts.get(cmd) else {
+    pub fn run_named(&self, invocation: &Invocation, output: &impl ScriptOutput) -> Result<()> {
+        let Some(mut scripts) = self.scripts.resolve(&invocation.event)? else {
             return Ok(());
         };
 
-        let mut scripts = ScriptEntry::from_def(def);
-
-        // Append extra_args to the last entry, if any were supplied.
-        if !extra_args.is_empty()
-            && let Some(last) = scripts.last_mut() {
-                let extra = extra_args.join(" ");
-                *last = match last {
-                    ScriptEntry::Shell(cmd)       => ScriptEntry::Shell(format!("{cmd} {extra}")),
-                    ScriptEntry::PhpCommand(args) => ScriptEntry::PhpCommand(format!("{args} {extra}")),
-                    ScriptEntry::PhpCallback(_)   => last.clone(),
+        // Append the arguments to the last entry, if any were supplied.
+        if !invocation.arguments.is_empty()
+            && let Some(script) = scripts.last_mut() {
+                let extra = invocation.arguments.join(" ");
+                *script = match script {
+                    ScriptEntry::Shell(cmd) => {
+                        ScriptEntry::Shell(format!("{cmd} {extra}"))
+                    },
+                    ScriptEntry::PhpCommand(args) => {
+                        ScriptEntry::PhpCommand(format!("{args} {extra}"))
+                    },
+                    _ => script.clone(),
                 };
         }
 
+        let executor = Executor::new(&self.environment, invocation);
         for script in &scripts {
-            self.executor.execute(script, output)?;
+            executor.execute(script, output)?;
         }
         Ok(())
     }
@@ -106,6 +111,8 @@ pub enum ScriptEntry {
     PhpCallback(String),
     /// A shell command passed directly to the system shell.
     Shell(String),
+    /// Another script from the same manifest, written as `@name`.
+    Reference(String),
 }
 
 /// Classifies a raw manifest string into the appropriate `ScriptEntry` variant.
@@ -115,6 +122,9 @@ impl FromStr for ScriptEntry {
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         if let Some(cmd) = string.strip_prefix("@php ") {
             return Ok(Self::PhpCommand(cmd.to_owned()));
+        }
+        if let Some(name) = string.strip_prefix('@') {
+            return Ok(Self::Reference(name.to_owned()));
         }
         if string.contains("::") {
             return Ok(Self::PhpCallback(string.to_owned()));

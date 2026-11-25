@@ -1,8 +1,8 @@
 [package]
 name              = "phast-registry"
-version           = "0.1.0"
 edition           = "2024"
 description       = "Package sources for Phast: registries, git hosts, paths, and the HTTP stack behind them"
+version.workspace = true
 authors.workspace = true
 license.workspace = true
 publish.workspace = true

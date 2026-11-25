@@ -57,7 +57,8 @@ pub fn phast_toml_exists() -> &'static str {
 
 /// phast.toml was not found in the current directory.
 pub fn phast_toml_not_found() -> &'static str {
-    "phast.toml not found. Run `phast init` first."
+    "phast.toml not found. Run `phast migrate` to create it from composer.json. \
+    Run `phast init` to start a new one."
 }
 
 /// phast.lock was not found in the current directory.
@@ -68,6 +69,14 @@ pub fn phast_lock_not_found() -> &'static str {
 /// The named script was not found in `[scripts]`.
 pub fn script_not_found(name: &str) -> String {
     format!("script '{}' not found in [scripts].", name)
+}
+
+/// Map scripts are not supported.
+pub fn map_script_skipped(name: &str, commands: &str) -> String {
+    format!(
+        "Skipping '{name}': Phast doesn't support map scripts. \
+         Run these yourself if you need them: {commands}"
+    )
 }
 
 /// composer.json was not found in the current directory.

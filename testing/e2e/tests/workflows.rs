@@ -15,14 +15,14 @@ use phast_test_support::workflow::Workflow;
 ///
 /// The name is written once, as an identifier, and `stringify!` turns it into the
 /// directory to load. Wrappers written by hand repeat it twice, which puts
-/// `fn remove() { run("add") }` one copy-paste away: `add` would run twice, `remove`
+/// `fn remove() { execute("add") }` one copy-paste away: `add` would run twice, `remove`
 /// would never run, and both tests would report green.
 macro_rules! workflows {
     ($($name:ident),* $(,)?) => {
         $(
             #[test]
             fn $name() {
-                run(stringify!($name));
+                execute(stringify!($name));
             }
         )*
     };
@@ -32,11 +32,11 @@ macro_rules! workflows {
 // The identifier is both the test name and the directory to load,
 // so the two can never drift apart; a directory left out of this list simply never runs.
 workflows![
-    init, add, remove, install, update, autoload, workspace, migrate
+    init, add, remove, install, update, autoload, run, workspace, migrate
 ];
 
 /// Load and run `workflows/{name}`, failing the test with the workflow's diagnostics.
-fn run(name: &str) {
+fn execute(name: &str) {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("workflows")
         .join(name);

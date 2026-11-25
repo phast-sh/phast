@@ -280,6 +280,79 @@ async fn a_replaced_package_is_dropped_even_when_the_registry_serves_it() {
     assert!(!solution.contains_key(&package("illuminate/auth")));
 }
 
+#[tokio::test]
+async fn a_package_that_replaces_itself_still_resolves() {
+    let mut provider = MemoryProvider::new();
+    provider.add_package_full(
+        "barryvdh/laravel-debugbar",
+        stable(4, 4, 5),
+        vec![],
+        vec![],
+        vec![("barryvdh/laravel-debugbar".to_owned(), stable(4, 4, 5))],
+    );
+
+    let solution = run(
+        provider,
+        vec![requirement("barryvdh/laravel-debugbar", "^4.0")],
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        solution[&package("barryvdh/laravel-debugbar")],
+        stable(4, 4, 5),
+    );
+}
+
+#[tokio::test]
+async fn a_provider_found_late_still_satisfies_a_virtual_requirement() {
+    let mut provider = MemoryProvider::new();
+    provider.add_package_full(
+        "guzzlehttp/guzzle",
+        stable(7, 16, 1),
+        vec![],
+        vec![("psr/http-client-implementation".to_owned(), stable(1, 0, 0))],
+        vec![],
+    );
+    provider.add_package(
+        "openai-php/client",
+        stable(0, 8, 5),
+        vec![
+            dependency("php-http/multipart-stream-builder", "^1.3"),
+            dependency("psr/http-client-implementation", "^1.0.1"),
+        ],
+    );
+    provider.add_package(
+        "php-http/multipart-stream-builder",
+        stable(1, 3, 0),
+        vec![dependency("php-http/discovery", "^1.19")],
+    );
+    provider.add_package_full(
+        "php-http/discovery",
+        stable(1, 20, 0),
+        vec![],
+        vec![(
+            "psr/http-client-implementation".to_owned(),
+            stable(1, 20, 0),
+        )],
+        vec![],
+    );
+
+    let solution = run(
+        provider,
+        vec![
+            requirement("guzzlehttp/guzzle", "^7.14"),
+            requirement("openai-php/client", "^0.8.5"),
+        ],
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(solution[&package("openai-php/client")], stable(0, 8, 5));
+    assert_eq!(solution[&package("php-http/discovery")], stable(1, 20, 0));
+    assert!(!solution.contains_key(&package("psr/http-client-implementation")));
+}
+
 // ---------------------------------------------------------------------------
 // A virtual package the root itself satisfies
 // ---------------------------------------------------------------------------

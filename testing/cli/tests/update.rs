@@ -203,6 +203,31 @@ async fn update_no_dev_still_locks_the_dev_packages() {
 }
 
 #[tokio::test]
+async fn update_no_dev_removes_the_dev_packages() {
+    let registry = registry().await;
+    let project = Project::new().manifest(MANIFEST_WITH_DEV);
+
+    project
+        .cmd()
+        .args(["install", "--registry-url", &registry.uri()])
+        .assert()
+        .success();
+    assert!(project.root().join("vendor/vendor/beta").is_dir());
+
+    project
+        .cmd()
+        .args(["update", "--no-dev", "--registry-url", &registry.uri()])
+        .assert()
+        .success();
+
+    assert!(
+        !project.root().join("vendor/vendor/beta").exists(),
+        "a dev package survived update --no-dev",
+    );
+    assert!(project.root().join("vendor/vendor/alpha").is_dir());
+}
+
+#[tokio::test]
 async fn update_runs_the_update_hooks() {
     let manifest = formatdoc! {r#"
         {MANIFEST}

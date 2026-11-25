@@ -12,6 +12,7 @@
 //! honored in every phase.
 
 pub mod path_linker;
+pub mod prune;
 pub mod requirements;
 pub mod vendor;
 
@@ -25,6 +26,7 @@ use crate::output::Printer;
 
 pub use autoloader::Autoloader;
 use locker::Locker;
+use prune::Pruner;
 use resolver::{ResolveRequest, Resolver};
 use vendor::Vendor;
 
@@ -127,6 +129,8 @@ pub struct Installer {
     locker: Locker,
     /// Fetches package archives into `vendor/`.
     vendor: Vendor,
+    /// Empties `vendor/` of what left the lock.
+    pruner: Pruner,
     /// Generates `vendor/autoload.php` and `vendor/bin/`.
     autoloader: Autoloader,
     /// Dispatches lifecycle events to registered handlers.
@@ -162,12 +166,14 @@ impl Installer {
         let resolver   = Resolver::new(registry_url, http_client, cache_dir, printer.clone());
         let locker     = Locker::new(lock_path, printer.clone());
         let vendor     = Vendor::new(downloader, vendor_dir.clone(), printer.clone());
+        let pruner     = Pruner::new(vendor_dir.clone(), printer.clone());
         let autoloader = Autoloader::new(vendor_dir, lifecycle.clone(), printer.clone());
 
         Self {
             resolver,
             locker,
             vendor,
+            pruner,
             autoloader,
             lifecycle,
             workspace,
@@ -289,6 +295,7 @@ impl Installer {
 
                 self.vendor.install(plan).await?;
 
+                self.prune(&lock, options.no_dev)?;
                 self.autoload(&lock, options.no_dev, options.authoritative)?;
 
                 self.lifecycle.fire(LifecycleEvent::PostInstallCmd)?;
@@ -331,6 +338,7 @@ impl Installer {
         );
         self.vendor.install(plan).await?;
 
+        self.prune(&lock, options.no_dev)?;
         self.autoload(&lock, options.no_dev, options.authoritative)?;
 
         self.lifecycle.fire(LifecycleEvent::PostInstallCmd)?;
@@ -385,6 +393,7 @@ impl Installer {
         let changed = vendor::changed_versions(old_lock.as_ref(), &lock);
         self.vendor.update(planned, &changed).await?;
 
+        self.prune(&lock, options.no_dev)?;
         self.autoload(&lock, options.no_dev, false)?;
 
         self.lifecycle.fire(LifecycleEvent::PostUpdateCmd)?;
@@ -393,6 +402,15 @@ impl Installer {
         self.printer.summary(total, start.elapsed().as_secs_f64());
 
         Ok(())
+    }
+
+    /// Run the prune phase: remove from `vendor/` what the lock no longer keeps.
+    ///
+    /// The whole lock decides, never a member's closure, so a scoped install keeps what
+    /// another member uses.
+    fn prune(&self, lock: &PhastLock, no_dev: bool) -> Result<()> {
+        let kept = vendor::plan_install(lock, None, no_dev);
+        self.pruner.retain(&kept)
     }
 
     /// Run the autoload phase: regenerate the autoloader
