@@ -138,8 +138,8 @@ jobs:
         env:
           PHAST_TEST_NETWORK: 1
 
-  autoload-test:
-    name: Autoload Tests (PHP ${{ matrix.php }})
+  php-test:
+    name: PHP Tests (${{ matrix.php }})
     runs-on: ubuntu-latest
     needs: [build, unit-test]
     env:
@@ -168,5 +168,8 @@ jobs:
       # Recorded so a green leg says which interpreter it was green against.
       - run: php --version
 
-      # The workflow needs no registry: it resolves through a path repository.
+      # Checks if the autoloader produced by Phast works on the given PHP version.
       - run: cargo test --locked -p phast-e2e-tests autoload -- --nocapture
+
+      # Checks if callbacks run by Phast work on the given PHP version.
+      - run: cargo test --locked -p phast-e2e-tests run -- --nocapture

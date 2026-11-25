@@ -55,7 +55,18 @@ pub async fn run(args: InstallArgs, cache_dir: PathBuf, printer: &Printer) -> Re
     let scope  = resolve_scope(member)?;
 
     let lifecycle = if args.scripts.run() {
-        lifecycle::register(workspace.manifest().scripts.clone(), printer, &[
+        let scripts = workspace.manifest().scripts.clone();
+        let project = lifecycle::project(
+            workspace.manifest(),
+            workspace.root(),
+            args.dev.include(),
+        )?;
+        let loader = lifecycle::Loader::new(
+            &workspace,
+            args.dev.include(),
+        )?;
+
+        lifecycle::register(scripts, project, loader, printer, &[
             LifecycleEvent::PreInstallCmd,
             LifecycleEvent::PostInstallCmd,
             LifecycleEvent::PreAutoloadDump,

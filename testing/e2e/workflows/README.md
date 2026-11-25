@@ -32,6 +32,7 @@ What that leaves:
 | `install`   | everything                    | lock, autoload, vendor tree, generated PHP   |
 | `update`    | moving versions               | resolution against a live registry           |
 | `autoload`  | every class a project loads   | a real interpreter loads what Phast wrote    |
+| `run`       | projects with install hooks   | a real interpreter runs the callback         |
 | `workspace` | multi-package repos           | members installed for real, and no fallback  |
 | `migrate`   | adopting Phast at all         | the emitted manifest is then fed to Phast    |
 
@@ -41,7 +42,7 @@ the honest shape of its contract, since what it is for is feeding the next comma
 `autoload` has one because its flags are not observable as text. `--no-dev` drops a rule
 from a map, and whether that matters is a question about what an interpreter can then
 resolve, which is why that workflow asserts by running PHP rather than by reading the maps
-it wrote. It is the only workflow that executes PHP at all.
+it wrote.
 
 Commands left out are not untested, they are tested one tier down. `fmt` is the worked
 example: a broken formatter is cosmetic and loud, and `testing/cli/tests/fmt.rs` already

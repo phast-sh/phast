@@ -111,7 +111,7 @@ pub fn generate(
     );
 
     let autoload_maps = Builder::new(vendor_dir, options.include_dev)
-        .build(lock, &members)?;
+        .maps(lock, &members)?;
     Writer::new(vendor_dir, &suffix)
         .authoritative(options.authoritative)
         .platform_check(requirements)

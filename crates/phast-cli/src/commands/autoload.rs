@@ -50,7 +50,18 @@ pub async fn run(args: AutoloadArgs, printer: &Printer) -> Result<()> {
         .context("could not read phast.lock; run `phast install` first")?;
 
     let lifecycle = if args.scripts.run() {
-        lifecycle::register(workspace.manifest().scripts.clone(), printer,&[
+        let scripts = workspace.manifest().scripts.clone();
+        let project = lifecycle::project(
+            workspace.manifest(),
+            workspace.root(),
+            args.dev.include(),
+        )?;
+        let loader = lifecycle::Loader::new(
+            &workspace,
+            args.dev.include(),
+        )?;
+
+        lifecycle::register(scripts, project, loader, printer, &[
             LifecycleEvent::PreAutoloadDump,
             LifecycleEvent::PostAutoloadDump,
         ])
