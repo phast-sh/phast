@@ -20,6 +20,7 @@ resolver = "3"
 
 # Shared package metadata.
 [workspace.package]
+version    = "0.1.1"
 authors    = ["Denys Horobtsov <0xbedrock@gmail.com>"]
 license    = "MIT OR Apache-2.0"
 repository = "https://github.com/phast-sh/phast"

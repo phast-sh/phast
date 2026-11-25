@@ -9,7 +9,7 @@ use std::sync::LazyLock;
 /// Every named phast release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Release {
-    /// `0.0.x` and `0.1.0`.
+    /// `0.0.x` and `0.1.x`.
     AiPetri,
 }
 

@@ -1,8 +1,8 @@
 [package]
 name                 = "phast-core"
-version              = "0.1.0"
 edition              = "2024"
 description          = "Shared domain types for Phast: manifests, lock files, package metadata"
+version.workspace    = true
 authors.workspace    = true
 license.workspace    = true
 repository.workspace = true
