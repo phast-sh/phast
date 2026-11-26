@@ -49,6 +49,7 @@ jobs:
         with:
           tool: cargo-zigbuild
 
+      # Linux goes through zig for a static musl binary; macOS builds natively.
       - name: Build
         run: |
           if [ "${{ matrix.cross }}" = "true" ]; then
@@ -57,6 +58,7 @@ jobs:
             cargo build --locked --release -p phast --target ${{ matrix.target }}
           fi
 
+      # The tarball and checksum install.sh and `phast cli update` download and verify.
       - name: Package + checksum
         run: |
           name="phast-${{ matrix.target }}"
@@ -83,3 +85,64 @@ jobs:
           files: |
             phast-${{ matrix.target }}.tar.gz
             phast-${{ matrix.target }}.tar.gz.sha256
+
+  docker:
+    name: docker image
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # The two Linux tarballs `build` uploaded, so the image holds the released binaries.
+      - name: Download the Linux builds
+        uses: actions/download-artifact@v8
+        with:
+          pattern: phast-*-unknown-linux-musl
+          path: artifacts
+
+      # One binary per platform, under the name buildx gives the platform's architecture.
+      - name: Unpack the Linux binaries
+        run: |
+          for pair in x86_64:amd64 aarch64:arm64; do
+            target="${pair%%:*}-unknown-linux-musl"
+            mkdir -p "dist/${pair##*:}"
+            tar -xzf "artifacts/phast-$target/phast-$target.tar.gz" -C "dist/${pair##*:}"
+          done
+
+      # A BuildKit builder, which build-push-action picks up on its own. Docker's default
+      # builder can't produce one image for two platforms.
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@v4
+
+      # vX.Y.Z gives X.Y.Z, X.Y and latest.
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/phast-sh/phast
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # Only a tag pushes, so only a tag logs in.
+      - name: Log in to GHCR
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Both platforms in one image, from the binaries in dist/.
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: dist
+          file: docker/phast/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

@@ -29,17 +29,3 @@ updates:
     groups:
       actions:
         update-types: [minor, patch]
-
-  # Base images in the Dockerfiles under docker/.
-  - package-ecosystem: docker
-    directories:
-      - /docker/phast
-      - /docker/php
-    schedule:
-      interval: weekly
-      day: monday
-    commit-message:
-      prefix: chore
-    groups:
-      docker:
-        update-types: [minor, patch]

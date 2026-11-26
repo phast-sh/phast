@@ -45,6 +45,32 @@ rustup installs the Rust version the repository pins, and `--locked` builds with
 dependency versions Phast is tested against. The binary goes to `~/.cargo/bin`, which
 rustup adds to your `PATH`.
 
+## In a Docker image
+
+Copy the binary from Phast's image into your own:
+
+```dockerfile
+FROM php:8.4-cli
+
+COPY --from=ghcr.io/phast-sh/phast:latest /phast /bin/
+
+WORKDIR /app
+COPY phast.toml phast.lock ./
+RUN phast install --no-dev
+```
+
+The image holds nothing but the `phast` binary, for `linux/amd64` and `linux/arm64`, and
+Docker picks the one for the platform you build for. It is the same binary as the release's
+Linux download. Your base image provides PHP, which Phast uses to run scripts.
+
+`latest` moves to every new release. To keep builds reproducible, pin a version, or a
+digest:
+
+```dockerfile
+COPY --from=ghcr.io/phast-sh/phast:0.1.2 /phast /bin/
+COPY --from=ghcr.io/phast-sh/phast:0.1.2@sha256:<digest> /phast /bin/
+```
+
 ## Requirements
 
 **PHP 8.0 or newer**, to use Phast: the generated `vendor/autoload.php` runs on any PHP
