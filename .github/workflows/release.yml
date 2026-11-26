@@ -133,9 +133,13 @@ jobs:
           labels: |
             org.opencontainers.image.description=Phast, a dependency manager for PHP. Copy it into your image: COPY --from=ghcr.io/phast-sh/phast:latest /phast /bin/
             org.opencontainers.image.licenses=MIT OR Apache-2.0
+            org.opencontainers.image.url=https://phast.sh
+            org.opencontainers.image.documentation=https://docs.phast.sh/getting-started/installation/#in-a-docker-image
           annotations: |
             org.opencontainers.image.description=Phast, a dependency manager for PHP. Copy it into your image: COPY --from=ghcr.io/phast-sh/phast:latest /phast /bin/
             org.opencontainers.image.licenses=MIT OR Apache-2.0
+            org.opencontainers.image.url=https://phast.sh
+            org.opencontainers.image.documentation=https://docs.phast.sh/getting-started/installation/#in-a-docker-image
 
       # Only a tag pushes, so only a tag logs in.
       - name: Log in to GHCR
