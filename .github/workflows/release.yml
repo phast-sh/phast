@@ -117,15 +117,25 @@ jobs:
       - name: Set up buildx
         uses: docker/setup-buildx-action@v4
 
-      # vX.Y.Z gives X.Y.Z, X.Y and latest.
+      # vX.Y.Z gives X.Y.Z, X.Y and latest. The description and license are set here,
+      # since the repository's own are a tagline and only half the license. GHCR reads
+      # a multi-platform image's description from the index annotations, not the labels.
       - name: Image tags
         id: meta
         uses: docker/metadata-action@v6
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ghcr.io/phast-sh/phast
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.description=Phast, a dependency manager for PHP. Copy it into your image: COPY --from=ghcr.io/phast-sh/phast:latest /phast /bin/
+            org.opencontainers.image.licenses=MIT OR Apache-2.0
+          annotations: |
+            org.opencontainers.image.description=Phast, a dependency manager for PHP. Copy it into your image: COPY --from=ghcr.io/phast-sh/phast:latest /phast /bin/
+            org.opencontainers.image.licenses=MIT OR Apache-2.0
 
       # Only a tag pushes, so only a tag logs in.
       - name: Log in to GHCR
@@ -146,3 +156,4 @@ jobs:
           push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
