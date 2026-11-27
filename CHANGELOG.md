@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/phast-sh/phast/releases/tag/v0.1.2)
+
+Released on 2026-11-27.
+
+### Bug fixes
+
+- Bring a cold resolve back to v0.1.0 speed
+
 ## [0.1.1](https://github.com/phast-sh/phast/releases/tag/v0.1.1)
 
 Released on 2026-11-25.
