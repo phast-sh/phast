@@ -92,6 +92,7 @@ impl PubGrubAdapter {
     }
 
     /// Whether `name` has been asked about already: its versions are cached, or it's a virtual package.
+    #[expect(dead_code, reason = "its caller in prioritize is commented out for now")]
     #[rustfmt::skip]
     fn is_known(&self, name: &PackageName) -> bool {
         let cached_version = self
@@ -201,11 +202,14 @@ impl pubgrub::DependencyProvider for PubGrubAdapter {
                 Reverse(PRIORITY_PLATFORM)
             }
             PubGrubPackage::Package(name) => {
-                // Ask about a new package right away, so a virtual one is ranked last before
-                // the solver reaches it. If that fails, choose_version asks again and reports the error.
-                if !self.is_known(name) {
-                    let _ = self.fetch_versions(name);
-                }
+                // TODO: asking about each new package here is what ranks a virtual one last
+                //       before the solver reaches it, but it blocks on one round trip per package,
+                //       one after another, which made a cold resolve about five times slower. Off
+                //       until the packages of a dependency list can be asked about together.
+                //
+                // if !self.is_known(name) {
+                //     let _ = self.fetch_versions(name);
+                // }
 
                 // Virtual packages have the lowest priority so all real packages
                 // (and their `provide` declarations) are processed before we try to satisfy them.
