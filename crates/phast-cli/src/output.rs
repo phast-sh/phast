@@ -90,6 +90,13 @@ impl Printer {
         }
     }
 
+    /// Print extra information, for when the user asks for more. Only shown at `-v` or higher.
+    pub fn detail(&self, msg: impl AsRef<str>) {
+        if self.verbosity >= Verbosity::Verbose {
+            println!("{}", styles::VERBOSITY_HINT.apply_to(msg.as_ref()));
+        }
+    }
+
     /// Print a per-phase summary ("Locked 289 packages in 6.53s"). Only shown at `-v` or higher.
     pub fn phase(&self, verb: &str, total: usize, elapsed: f64) {
         if self.verbosity >= Verbosity::Verbose {
