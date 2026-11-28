@@ -86,11 +86,10 @@ pub fn composer_json_not_found() -> &'static str {
 
 /// Manifests `phast fmt` rewrote. See [`manifests_not_formatted`] on the wording.
 pub fn manifests_formatted(formatted: usize, examined: usize) -> String {
-    if examined == 1 {
-        return "phast.toml formatted.".to_owned();
+    match examined {
+        1 => "phast.toml formatted.".to_owned(),
+        _ => format!("{formatted} manifests formatted."),
     }
-
-    format!("{formatted} manifests formatted.")
 }
 
 /// Manifests that would change under `phast fmt --check`.
@@ -99,20 +98,18 @@ pub fn manifests_formatted(formatted: usize, examined: usize) -> String {
 /// and a project with several is counted. One unformatted member out of three is still a
 /// count, which is why the number cannot decide it.
 pub fn manifests_not_formatted(unformatted: usize, examined: usize) -> String {
-    if examined == 1 {
-        return "phast.toml is not formatted. Run `phast fmt` to fix.".to_owned();
+    match examined {
+        1 => "phast.toml is not formatted. Run `phast fmt` to fix.".to_owned(),
+        _ => format!("{unformatted} manifests are not formatted. Run `phast fmt` to fix."),
     }
-
-    format!("{unformatted} manifests are not formatted. Run `phast fmt` to fix.")
 }
 
 /// Nothing for `phast fmt` to do. See [`manifests_not_formatted`] on the wording.
 pub fn manifests_already_formatted(examined: usize) -> &'static str {
-    if examined == 1 {
-        return "phast.toml is already formatted, nothing to do.";
+    match examined {
+        1 => "phast.toml is already formatted, nothing to do.",
+        _ => "Every manifest is already formatted, nothing to do.",
     }
-
-    "Every manifest is already formatted, nothing to do."
 }
 
 /// Nothing for `phast validate` to report, with any warnings it tolerated.
@@ -120,10 +117,9 @@ pub fn manifests_already_formatted(examined: usize) -> &'static str {
 /// `examined` decides the wording the same way it does for `phast fmt`: a project with one
 /// manifest is named, and a project with several is spoken of collectively.
 pub fn manifests_are_valid(warnings: usize, examined: usize) -> String {
-    let subject = if examined == 1 {
-        "phast.toml"
-    } else {
-        "Every manifest"
+    let subject = match examined {
+        1 => "phast.toml",
+        _ => "Every manifest",
     };
 
     match warnings {
@@ -181,12 +177,13 @@ pub fn constraint_pinned_by_workspace(name: &str, pinned: &str) -> String {
     )
 }
 
-/// A package has no integrity checksum, so it cannot be verified.
-pub fn missing_checksum(name: &str) -> String {
-    format!(
-        "'{}' has no checksum: the registry published none, so it cannot be verified.",
-        name,
-    )
+/// Packages installed without checksum verification, because their registry published no checksum.
+#[rustfmt::skip]
+pub fn unverified_packages(count: usize) -> String {
+    match count {
+        1 => "1 package has no published checksum, so it's installed unverified.".to_owned(),
+        _ => format!("{count} packages have no published checksum, so they're installed unverified."),
+    }
 }
 
 /// A version `minimum-package-age` rejected in a resolve that then failed, and the date it

@@ -395,3 +395,35 @@ async fn install_member_keeps_what_another_member_uses() {
         "a scoped install removed a sibling's package",
     );
 }
+
+// ---------------------------------------------------------------------------
+// Reporting packages installed without a checksum
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn install_verbose_reports_the_packages_without_a_checksum() {
+    let registry = registry().await;
+    let project = project();
+
+    project
+        .cmd()
+        .args(["install", "-v", "--registry-url", &registry.uri()])
+        .assert()
+        .success()
+        .stdout(contains(
+            "1 package has no published checksum, so it's installed unverified.",
+        ));
+}
+
+#[tokio::test]
+async fn install_without_verbose_says_nothing_about_checksums() {
+    let registry = registry().await;
+    let project = project();
+
+    project
+        .cmd()
+        .args(["install", "--registry-url", &registry.uri()])
+        .assert()
+        .success()
+        .stdout(contains("no published checksum").not());
+}

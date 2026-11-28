@@ -5,6 +5,7 @@
 //! the fetching. The split keeps the Installer free of download mechanics: it builds a plan
 //! and hands it to [`Vendor`].
 
+use crate::hints;
 use crate::installer::path_linker::PathLinker;
 use crate::output::Printer;
 
@@ -119,15 +120,12 @@ impl Vendor {
             .partition(PackageDef::is_path);
         self.path_linker.link(&paths)?;
 
-        // Surface any package the registry published without a checksum: it will
-        // be installed with no integrity verification (see `verify_checksum`).
-
-        // TODO: warn once per package installed without a checksum.
-        //       Disabled until the warnings can be grouped: one line
-        //       each floods a large install.
-        // for name in unverified_packages(&archives) {
-        //     self.printer.warning(hints::missing_checksum(name));
-        // }
+        // Packagist publishes no checksum for GitHub-hosted packages, which is most of
+        // them, so a warning here would show on nearly every install.
+        let unverified = unverified_packages(&archives);
+        if !unverified.is_empty() {
+            self.printer.detail(hints::unverified_packages(unverified.len()));
+        }
 
         let spinner = self.printer.spinner(&format!("{}...", action.present()));
         self.downloader
@@ -197,10 +195,6 @@ pub fn plan_install(lock: &PhastLock, member: Option<&str>, no_dev: bool) -> Vec
 ///
 /// A registry that omits the checksum disables verification for that package, see
 /// `verify_checksum` in the downloader.
-///
-/// Nobody is warned about it today. The one call site sits commented out in `download`,
-/// waiting on a way to report many packages without burying the rest of the output, so
-/// outside its own test this function has no caller.
 pub fn unverified_packages(packages: &[PackageDef]) -> Vec<&str> {
     packages
         .iter()
