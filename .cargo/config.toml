@@ -1,0 +1,4 @@
+# The CLI tests live in testing/cli, not next to the phast binary, so Cargo can't
+# tell them where Phast is. This points tests at Phast, the same way CI does.
+[env]
+PHAST_BIN = { value = "target/debug/phast", relative = true }

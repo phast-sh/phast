@@ -29,7 +29,6 @@ publish    = false
 # Shared dependency versions across all crates.
 [workspace.dependencies]
 # Internal crates
-phast           = { path = "crates/phast" }
 phast-cli       = { path = "crates/phast-cli" }
 phast-core      = { path = "crates/phast-core" }
 phast-version   = { path = "crates/phast-version" }
